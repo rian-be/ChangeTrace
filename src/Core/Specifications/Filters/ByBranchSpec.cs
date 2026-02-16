@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters events associated with specific branch.
@@ -19,6 +19,6 @@ internal sealed class ByBranchSpec(BranchName branchName) : Specification<TraceE
     /// <c>true</c> when the event references the given branch;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(TraceEvent item)
+    internal override bool IsSatisfiedBy(TraceEvent item)
         => item.BranchName != null && item.BranchName == branchName;
 }

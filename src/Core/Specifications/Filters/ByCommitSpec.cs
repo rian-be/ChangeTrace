@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters events associated with specific commit.
@@ -20,6 +20,6 @@ internal sealed class ByCommitSpec(CommitSha commitSha) : Specification<TraceEve
     /// <c>true</c> when the event commit matches the configured SHA;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(TraceEvent item)
+    internal override bool IsSatisfiedBy(TraceEvent item)
         => item.CommitSha != null && item.CommitSha.Matches(commitSha);
 }

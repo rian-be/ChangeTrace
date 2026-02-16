@@ -1,7 +1,7 @@
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters events by commit event classification.
@@ -20,6 +20,6 @@ internal sealed class ByCommitTypeSpec(CommitEventType commitType) : Specificati
     /// <c>true</c> when the event commit type matches the configured value;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(TraceEvent item)
+    internal override bool IsSatisfiedBy(TraceEvent item)
         => item.CommitType == commitType;
 }

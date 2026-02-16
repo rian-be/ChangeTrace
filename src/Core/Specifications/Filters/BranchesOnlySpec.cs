@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters events that are associated with Git branch.
@@ -19,6 +19,6 @@ internal sealed class BranchesOnlySpec : Specification<TraceEvent>
     /// <c>true</c> when the event contains branch information;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(TraceEvent item) 
+    internal override bool IsSatisfiedBy(TraceEvent item) 
         => item.BranchType.HasValue;
 }

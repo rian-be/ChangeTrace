@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters events performed by specific actor.
@@ -19,6 +19,6 @@ internal sealed class ByActorSpec(ActorName actor) : Specification<TraceEvent>
     /// <c>true</c> when the event actor matches the configured actor;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(TraceEvent item) 
+    internal override bool IsSatisfiedBy(TraceEvent item) 
         => item.Actor == actor;
 }

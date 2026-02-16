@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters file events by file extension.
@@ -23,7 +23,7 @@ internal sealed class ByExtensionSpec(string extension) : Specification<TraceEve
     /// <returns>
     /// <c>true</c> when the file path has the specified extension; otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(TraceEvent item)
+    internal override bool IsSatisfiedBy(TraceEvent item)
         => item.FilePath != null &&
            item.FilePath.Extension.Equals(_extension, StringComparison.OrdinalIgnoreCase);
 }
