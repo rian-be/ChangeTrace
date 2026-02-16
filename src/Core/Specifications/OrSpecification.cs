@@ -23,6 +23,6 @@ internal sealed class OrSpecification<T>(Specification<T> left, Specification<T>
     /// <c>true</c> if either specification returns <c>true</c>;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(T item) 
+    internal override bool IsSatisfiedBy(T item) 
         => left.IsSatisfiedBy(item) || right.IsSatisfiedBy(item);
 }

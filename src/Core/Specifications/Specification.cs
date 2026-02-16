@@ -19,7 +19,7 @@ internal abstract class Specification<T>
     /// <c>true</c> when the item matches the rule;
     /// otherwise <c>false</c>.
     /// </returns>
-    public abstract bool IsSatisfiedBy(T item);
+    internal abstract bool IsSatisfiedBy(T item);
 
     /// <summary>
     /// Combines this specification with another using logical AND.
@@ -29,7 +29,7 @@ internal abstract class Specification<T>
     /// </summary>
     /// <param name="other">Specification to combine with</param>
     /// <returns>Composite specification representing conjunction</returns>
-    public Specification<T> And(Specification<T> other) 
+    internal Specification<T> And(Specification<T> other) 
         => new AndSpecification<T>(this, other);
 
     /// <summary>
@@ -40,7 +40,7 @@ internal abstract class Specification<T>
     /// </summary>
     /// <param name="other">Specification to combine with</param>
     /// <returns>Composite specification representing disjunction</returns>
-    public Specification<T> Or(Specification<T> other) 
+    internal Specification<T> Or(Specification<T> other) 
         => new OrSpecification<T>(this, other);
 
     /// <summary>
@@ -49,6 +49,6 @@ internal abstract class Specification<T>
     /// Resulting specification inverts the evaluation result.
     /// </summary>
     /// <returns>Specification representing logical negation</returns>
-    public Specification<T> Not() 
+    internal Specification<T> Not() 
         => new NotSpecification<T>(this);
 }

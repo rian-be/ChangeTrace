@@ -21,6 +21,6 @@ internal sealed class NotSpecification<T>(Specification<T> spec) : Specification
     /// <c>true</c> when the inner specification returns <c>false</c>;
     /// otherwise <c>false</c>.
     /// </returns>
-    public override bool IsSatisfiedBy(T item) 
+    internal override bool IsSatisfiedBy(T item) 
         => !spec.IsSatisfiedBy(item);
 }
