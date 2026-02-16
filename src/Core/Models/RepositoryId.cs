@@ -10,9 +10,10 @@ namespace ChangeTrace.Core.Models;
 /// </summary>
 internal sealed record RepositoryId : ValueObject
 {
-    private string Owner { get; }
-    private string Name { get; }
-    private string FullName => $"{Owner}/{Name}";
+    internal string Owner { get; }
+    internal string Name { get; }
+
+    internal string FullName => $"{Owner}/{Name}";
 
     private RepositoryId(string owner, string name)
     {

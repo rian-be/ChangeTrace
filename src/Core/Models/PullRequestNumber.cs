@@ -9,7 +9,7 @@ namespace ChangeTrace.Core.Models;
 /// </summary>
 internal readonly struct PullRequestNumber
 {
-    private int Value { get; }
+    internal int Value { get; }
     private PullRequestNumber(int value) => Value = value;
 
     /// <summary>

@@ -1,7 +1,8 @@
 using ChangeTrace.Core.Enums;
+using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 
-namespace ChangeTrace.Core.Models;
+namespace ChangeTrace.Core.Events;
 
 /// <summary>
 /// Rich domain model for a single Git event.
@@ -10,8 +11,8 @@ namespace ChangeTrace.Core.Models;
 internal sealed class TraceEvent
 {
     // Core properties
-    public Timestamp Timestamp { get; private set; }
-    public ActorName Actor { get; }
+    internal Timestamp Timestamp { get; private set; }
+    internal ActorName Actor { get; }
     public string Target { get; }
     public string? Metadata { get; private set; }
     
@@ -19,6 +20,13 @@ internal sealed class TraceEvent
     public CommitSha? CommitSha { get; }
     public BranchName? BranchName { get; }
     public PullRequestNumber? PullRequestNumber { get; private set; }
+    
+    public List<ActorName>? Reviewers { get; private set; }
+    public ActorName? MergedBy { get; private set; }  
+    
+    public List<ActorName>? Contributors { get; private set; }
+    public Dictionary<ActorName, Timestamp>? LastModified { get; private set; }
+    
     public FilePath? FilePath { get; }
     
     // Event types
@@ -26,7 +34,7 @@ internal sealed class TraceEvent
     public BranchEventType? BranchType { get; }
     public PullRequestEventType? PrType { get; private set; }
 
-    private TraceEvent(
+    internal TraceEvent(
         Timestamp timestamp,
         ActorName actor,
         string target,
@@ -51,112 +59,11 @@ internal sealed class TraceEvent
         BranchType = branchType;
         PrType = prType;
     }
-
-    /// <summary>
-    /// Factory: Create commit event
-    /// </summary>
-    public static TraceEvent CreateCommit(
-        Timestamp timestamp,
-        ActorName actor,
-        CommitSha commitSha,
-        string? message = null)
-    {
-        return new TraceEvent(
-            timestamp: timestamp,
-            actor: actor,
-            target: commitSha.Value,
-            metadata: message,
-            commitSha: commitSha,
-            branchName: null,
-            prNumber: null,
-            filePath: null,
-            commitType: CommitEventType.Commit,
-            branchType: null,
-            prType: null
-        );
-    }
-
-    /// <summary>
-    /// Factory: Create file change event
-    /// </summary>
-    public static TraceEvent CreateFileChange(
-        Timestamp timestamp,
-        ActorName actor,
-        FilePath filePath,
-        CommitEventType changeType,
-        CommitSha commitSha,
-        string? metadata = null)
-    {
-        return new TraceEvent(
-            timestamp: timestamp,
-            actor: actor,
-            target: filePath.Value,
-            metadata: metadata,
-            commitSha: commitSha,
-            branchName: null,
-            prNumber: null,
-            filePath: filePath,
-            commitType: changeType,
-            branchType: null,
-            prType: null
-        );
-    }
-
-    /// <summary>
-    /// Factory: Create branch event
-    /// </summary>
-    public static TraceEvent CreateBranch(
-        Timestamp timestamp,
-        ActorName actor,
-        BranchName branchName,
-        BranchEventType branchType,
-        CommitSha? commitSha = null,
-        string? metadata = null)
-    {
-        return new TraceEvent(
-            timestamp: timestamp,
-            actor: actor,
-            target: branchName.Value,
-            metadata: metadata,
-            commitSha: commitSha,
-            branchName: branchName,
-            prNumber: null,
-            filePath: null,
-            commitType: null,
-            branchType: branchType,
-            prType: null
-        );
-    }
-
-    /// <summary>
-    /// Factory: Create merge commit event
-    /// </summary>
-    public static TraceEvent CreateMerge(
-        Timestamp timestamp,
-        ActorName actor,
-        CommitSha commitSha,
-        BranchName? targetBranch = null,
-        string? message = null)
-    {
-        return new TraceEvent(
-            timestamp: timestamp,
-            actor: actor,
-            target: commitSha.Value,
-            metadata: message,
-            commitSha: commitSha,
-            branchName: targetBranch,
-            prNumber: null,
-            filePath: null,
-            commitType: CommitEventType.Commit,
-            branchType: BranchEventType.Merge,
-            prType: null
-        );
-    }
-
+    
     /// <summary>
     /// Enrich event with PR data (mutation for performance)
     /// </summary>
-    public Result EnrichWithPullRequest(
+    internal Result EnrichWithPullRequest(
         PullRequestNumber prNumber,
         PullRequestEventType prType,
         string? additionalMetadata = null)
@@ -176,25 +83,34 @@ internal sealed class TraceEvent
     /// <summary>
     /// Normalize timestamp relative to base time
     /// </summary>
-    public void NormalizeTime(Timestamp baseTime)
+    internal void NormalizeTime(Timestamp baseTime)
     {
         Timestamp = Timestamp.Normalize(baseTime);
     }
 
+    internal void AddContributor(ActorName actor, Timestamp time)
+    {
+        if (Contributors == null) Contributors = new List<ActorName>();
+        if (!Contributors.Contains(actor)) Contributors.Add(actor);
+
+        if (LastModified == null) LastModified = new Dictionary<ActorName, Timestamp>();
+        LastModified[actor] = time;
+    }
+    
     /// <summary>
     /// Check if this is a merge commit
     /// </summary>
-    public bool IsMergeCommit() => BranchType == BranchEventType.Merge;
+    internal bool IsMergeCommit() => BranchType == BranchEventType.Merge;
 
     /// <summary>
     /// Check if event has PR data
     /// </summary>
-    public bool HasPullRequest() => PrType.HasValue;
+    internal bool HasPullRequest() => PrType.HasValue;
 
     /// <summary>
     /// Get human-readable event type
     /// </summary>
-    public string GetEventType() => (PrType, BranchType, CommitType) switch
+    internal string GetEventType() => (PrType, BranchType, CommitType) switch
     {
         (not null, _, _) => $"PR:{PrType}",
         (_, not null, _) => $"Branch:{BranchType}",
@@ -205,7 +121,7 @@ internal sealed class TraceEvent
     /// <summary>
     /// Check if target matches (supports partial SHA matching)
     /// </summary>
-    public bool MatchesTarget(string target)
+    internal bool MatchesTarget(string target)
     {
         if (Target.Equals(target, StringComparison.Ordinal))
             return true;

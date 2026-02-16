@@ -1,4 +1,5 @@
 using ChangeTrace.Core.Enums;
+using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Specifications.Filters;

@@ -10,7 +10,7 @@ namespace ChangeTrace.Core.Models;
 /// </summary>
 internal sealed record ActorName : ValueObject
 {
-    private string Value { get; }
+    internal string Value { get; }
     private ActorName(string value) => Value = value;
 
     /// <summary>

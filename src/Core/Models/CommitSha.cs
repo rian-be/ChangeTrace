@@ -17,7 +17,7 @@ internal sealed partial record CommitSha : ValueObject
     private static readonly Regex ShaRegex = MyRegex();
 
     public string Value { get; }
-    private string Short => Value.Length > 7 ? Value[..7] : Value;
+    internal string Short => Value.Length > 7 ? Value[..7] : Value;
 
     private CommitSha(string value) => Value = value;
     
