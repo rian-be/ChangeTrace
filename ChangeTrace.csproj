@@ -11,7 +11,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="src\Cli\Rendering\" />
       <Folder Include="src\Core\Enums\" />
       <Folder Include="src\GIt\Extensions\" />
     </ItemGroup>
@@ -20,8 +19,6 @@
       <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
       <PackageReference Include="MessagePack" Version="3.1.4" />
       <PackageReference Include="MessagePack.Annotations" Version="3.1.4" />
-      <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
-      <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.3" />
       <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
       <PackageReference Include="Octokit" Version="14.0.0" />
       <PackageReference Include="Scrutor" Version="7.0.0" />
