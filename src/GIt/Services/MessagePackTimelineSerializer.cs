@@ -1,8 +1,10 @@
+using ChangeTrace.Configuration;
 using ChangeTrace.Core;
 using ChangeTrace.GIt.Dto;
 using ChangeTrace.GIt.Interfaces;
 using MessagePack;
 using MessagePack.Resolvers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.GIt.Services;
 
@@ -10,6 +12,7 @@ namespace ChangeTrace.GIt.Services;
 /// Serializer for <see cref="Timeline"/> using MessagePack format.
 /// Efficient, compact, supports LZ4 compression.
 /// </summary>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class MessagePackTimelineSerializer : ITimelineSerializer
 {
     private static readonly MessagePackSerializerOptions Options = MessagePackSerializerOptions.Standard

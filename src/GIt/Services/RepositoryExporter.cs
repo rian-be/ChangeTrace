@@ -1,3 +1,4 @@
+using ChangeTrace.Configuration;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Options;
@@ -6,6 +7,7 @@ using ChangeTrace.Core.Services;
 using ChangeTrace.GIt.Delegates;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.GIt.Services;
@@ -15,6 +17,7 @@ namespace ChangeTrace.GIt.Services;
 /// Orchestrates the complete export pipeline: clone (if needed), read commits, build timeline, enrich with PR data, and persist.
 /// This is the central coordinator that ties together all repository export operations.
 /// </summary>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class RepositoryExporter(
     IGitRepositoryReader gitReader,
     TimelineBuilder timelineBuilder,

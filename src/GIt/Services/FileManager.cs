@@ -1,4 +1,7 @@
+using ChangeTrace.Configuration;
+using ChangeTrace.Core;
 using ChangeTrace.GIt.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.GIt.Services;
 
@@ -6,6 +9,7 @@ namespace ChangeTrace.GIt.Services;
 /// Simple file manager for timelines.
 /// Handles reading, writing, and file discovery with extension management.
 /// </summary>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class FileManager : IFileManager
 {
     /// <summary>

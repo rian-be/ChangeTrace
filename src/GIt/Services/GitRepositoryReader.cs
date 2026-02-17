@@ -1,9 +1,11 @@
+using ChangeTrace.Configuration;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
 using LibGit2Sharp;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.GIt.Services;
@@ -13,6 +15,7 @@ namespace ChangeTrace.GIt.Services;
 /// Performance-focused, minimal allocations.
 /// FIXED: Proper branch detection using commit ancestry.
 /// </summary>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class GitRepositoryReader(ILogger<GitRepositoryReader> logger) : IGitRepositoryReader
 {
     /// <summary>
