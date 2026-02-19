@@ -1,6 +1,8 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Extensions;
 using ChangeTrace.Cli.Handlers;
+using ChangeTrace.Cli.Handlers.Auth;
+using ChangeTrace.Cli.Handlers.Profiles;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,8 +17,11 @@ public static class Program
         var services = new ServiceCollection();
      //   services.ConfigureApp(logLevel: LogLevel.Information);
         services.ConfigureApp(logLevel: LogLevel.Debug);
-
-        services.AddTransient<ExportCommandHandler>();
+        services.AddHttpClient();
+        
+        services.AddTransient<LoginCommandHandler>();
+        services.AddTransient<LogoutCommandHandler>();
+        services.AddTransient<ListCommandHandler>();
         
         var provider = services.BuildServiceProvider();
 
@@ -24,10 +29,13 @@ public static class Program
         foreach (var def in provider.GetServices<ICliCommand>())
         {
             var cmd = def.Build();
-            cmd.AttachHandler(provider, def.HandlerType);
+    
+            if (def.HandlerType != null)
+                cmd.AttachHandler(provider, def.HandlerType);
+
             root.Add(cmd);
         }
-
+         
         return await root.Parse(args).InvokeAsync();
     }
 }

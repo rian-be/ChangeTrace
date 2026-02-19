@@ -1,8 +1,11 @@
+using ChangeTrace.Configuration;
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Results;
+using ChangeTrace.GIt.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.Core.Services;
@@ -13,7 +16,8 @@ namespace ChangeTrace.Core.Services;
 /// (commits, file changes, branch operations, merges) based on configuration options.
 /// Focuses on performance and clarity with minimal allocations.
 /// </summary>
-internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger)
+[AutoRegister(ServiceLifetime.Singleton)]
+internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimelineBuilder
 {
     /// <summary>
     /// Builds a timeline from a collection of commits.
@@ -24,7 +28,7 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger)
     /// A <see cref="Result{Timeline}"/> containing the constructed timeline with all requested events,
     /// or failure with error details if building fails.
     /// </returns>
-    internal Result<Timeline> Build(
+    public Result<Timeline> Build(
         IReadOnlyList<CommitData> commits,
         TimelineBuilderOptions options)
     {

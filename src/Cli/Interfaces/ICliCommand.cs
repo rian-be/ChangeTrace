@@ -22,5 +22,5 @@ internal interface ICliCommand
     /// <summary>
     /// Gets the <see cref="Type"/> of handler responsible for executing this command.
     /// </summary>
-    Type HandlerType { get; }
+    Type? HandlerType { get; }
 }

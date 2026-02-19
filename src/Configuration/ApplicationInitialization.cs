@@ -29,6 +29,12 @@ internal static class ApplicationInitialization
     internal static void ConfigureApp(this IServiceCollection services,
         LogLevel logLevel = LogLevel.Information)
     {
+        services.AddLogging(builder =>
+        {
+            builder.SetMinimumLevel(logLevel);
+            builder.AddProvider(new SpectreConsoleLoggerProvider(logLevel));
+        });
+        
         var discoveryLogger = LoggerFactory.Create(builder =>
         {
             builder.SetMinimumLevel(LogLevel.Debug);
