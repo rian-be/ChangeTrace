@@ -30,21 +30,10 @@ internal sealed class AuthService(
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Logs in to the specified provider and stores the resulting <see cref="AuthSession"/>.
-    /// </summary>
-    /// <param name="provider">The name of the authentication provider.</param>
-    /// <param name="ct">Cancellation token to cancel the operation.</param>
-    /// <returns>The <see cref="AuthSession"/> obtained from the provider.</returns>
-    /// <exception cref="InvalidOperationException">Thrown if the provider is not registered.</exception>
-    public async Task<AuthSession> LoginAsync(string provider, CancellationToken ct = default) =>
-        await PerformLogin(GetProvider(provider), ct);
-    
-
-    /// <summary>
     /// Returns existing session or performs login if missing.
     /// Intended for normal application operations.
     /// </summary>
-    public async Task<AuthSession> GetOrLoginAsync(string provider, CancellationToken ct = default)
+    public async Task<AuthSession> FetchSession(string provider, CancellationToken ct = default)
     {
         var p = GetProvider(provider);
 
@@ -54,12 +43,14 @@ internal sealed class AuthService(
         {
             var existing = await store.GetAsync(provider, ct);
 
-            if (existing is null) return await PerformLogin(p, ct);
-            var validation = await ValidateSession(p, existing, ct);
-            if (validation.IsSuccess)
-                return existing;
-                
-            await store.RemoveAsync(provider, ct);
+            if (existing is not null)
+            {
+                var validation = await ValidateSession(p, existing, ct);
+                if (validation.IsSuccess)
+                    return existing;
+
+                await store.RemoveAsync(provider, ct);
+            }
 
             return await PerformLogin(p, ct);
         }
@@ -74,7 +65,7 @@ internal sealed class AuthService(
     /// </summary>
     /// <param name="provider">The name of the authentication provider.</param>
     /// <param name="ct">Cancellation token to cancel the operation.</param>
-    public Task LogoutAsync(string provider, CancellationToken ct = default)
+    public Task LogoutSession(string provider, CancellationToken ct = default)
         => store.RemoveAsync(provider, ct);
 
     /// <summary>
@@ -82,7 +73,7 @@ internal sealed class AuthService(
     /// </summary>
     /// <param name="ct">Cancellation token to cancel the operation.</param>
     /// <returns>A read-only list of all <see cref="AuthSession"/> objects.</returns>
-    public Task<IReadOnlyList<AuthSession>> ListAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<AuthSession>> ListProviders(CancellationToken ct = default)
         => store.ListAsync(ct);
 
     /// <summary>
@@ -91,7 +82,7 @@ internal sealed class AuthService(
     /// <param name="provider">The name of the authentication provider.</param>
     /// <param name="ct">Cancellation token to cancel the operation.</param>
     /// <returns>The <see cref="AuthSession"/> if found; otherwise, <c>null</c>.</returns>
-    public Task<AuthSession?> GetAsync(string provider, CancellationToken ct = default)
+    public Task<AuthSession?> GetSession(string provider, CancellationToken ct = default)
         => store.GetAsync(provider, ct);
     
     private IAuthProvider GetProvider(string provider) => !_providers.TryGetValue(provider, out var p)

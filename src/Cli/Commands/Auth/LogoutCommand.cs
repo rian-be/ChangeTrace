@@ -35,12 +35,12 @@ internal sealed class LogoutCommand : ICliCommand
     public Command Build()
     {
         var cmd = new Command("logout", "Remove stored credentials");
-
         var provider = new Argument<string>("provider")
         {
-            Description = "Provider to logout from"
+            Description = "Provider to logout from",
+            Arity = ArgumentArity.ZeroOrOne
         };
-
+        
         cmd.Arguments.Add(provider);
         return cmd;
     }

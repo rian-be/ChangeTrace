@@ -30,5 +30,5 @@ internal sealed class ListCommand : ICliCommand
     /// Builds the <see cref="Command"/> instance representing the 'list' CLI command.
     /// </summary>
     /// <returns>A configured <see cref="Command"/> with no arguments or options.</returns>
-    public Command Build() => new Command("list", "List authenticated providers");
+    public Command Build() => new("list", "List authenticated providers");
 }
