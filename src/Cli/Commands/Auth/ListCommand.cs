@@ -24,7 +24,8 @@ internal sealed class ListCommand : ICliCommand
     /// Gets the handler type responsible for executing this command.
     /// </summary>
     public Type HandlerType => typeof(ListCommandHandler);
-
+    public Type Parent => typeof(AuthCommand);
+    
     /// <summary>
     /// Builds the <see cref="Command"/> instance representing the 'list' CLI command.
     /// </summary>

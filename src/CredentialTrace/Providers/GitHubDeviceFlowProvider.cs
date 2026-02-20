@@ -22,7 +22,7 @@ namespace ChangeTrace.CredentialTrace.Providers;
 /// </list>
 /// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
-internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IAuthProvider
+internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IAuthProvider, IValidatableAuthProvider
 {
     private const string ClientId = "Ov23liZADv3yvX37gzcw";
 
@@ -50,6 +50,16 @@ internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IAuthProvider
             CreatedAt: DateTimeOffset.UtcNow);
     }
 
+    public async Task<bool> ValidateTokenAsync(string token, CancellationToken ct = default)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Headers.UserAgent.ParseAdd("ChangeTraceCLI");
+
+        var res = await http.SendAsync(req, ct);
+        return res.IsSuccessStatusCode;
+    }
+    
     /// <summary>
     /// Requests a device code from GitHub for the device flow.
     /// </summary>
@@ -142,16 +152,16 @@ internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IAuthProvider
             if (!string.IsNullOrEmpty(token.access_token))
                 return token;
 
-            if (token.error == "authorization_pending")
-                continue;
-
-            if (token.error == "slow_down")
+            switch (token.error)
             {
-                await Task.Delay(2000, ct);
-                continue;
+                case "authorization_pending":
+                    continue;
+                case "slow_down":
+                    await Task.Delay(2000, ct);
+                    continue;
+                default:
+                    throw new Exception($"OAuth error: {token.error} {token.error_description}");
             }
-
-            throw new Exception($"OAuth error: {token.error} {token.error_description}");
         }
 
         throw new OperationCanceledException();

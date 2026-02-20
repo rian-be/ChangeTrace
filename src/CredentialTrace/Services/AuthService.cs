@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using ChangeTrace.Configuration;
+using ChangeTrace.Core.Results;
 using ChangeTrace.CredentialTrace.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,6 +26,8 @@ internal sealed class AuthService(
 {
     private readonly Dictionary<string, IAuthProvider> _providers =
         providers.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+    
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Logs in to the specified provider and stores the resulting <see cref="AuthSession"/>.
@@ -32,18 +36,39 @@ internal sealed class AuthService(
     /// <param name="ct">Cancellation token to cancel the operation.</param>
     /// <returns>The <see cref="AuthSession"/> obtained from the provider.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the provider is not registered.</exception>
-    public async Task<AuthSession> LoginAsync(string provider, CancellationToken ct = default)
+    public async Task<AuthSession> LoginAsync(string provider, CancellationToken ct = default) =>
+        await PerformLogin(GetProvider(provider), ct);
+    
+
+    /// <summary>
+    /// Returns existing session or performs login if missing.
+    /// Intended for normal application operations.
+    /// </summary>
+    public async Task<AuthSession> GetOrLoginAsync(string provider, CancellationToken ct = default)
     {
-        if (!_providers.TryGetValue(provider, out var p))
-            throw new InvalidOperationException($"Provider '{provider}' not registered");
+        var p = GetProvider(provider);
 
-        var session = await p.LoginAsync(ct);
-        Console.WriteLine(session.AccessToken);
-        await store.SaveAsync(session, ct);
+        var gate = _locks.GetOrAdd(provider, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
+        try
+        {
+            var existing = await store.GetAsync(provider, ct);
 
-        return session;
+            if (existing is null) return await PerformLogin(p, ct);
+            var validation = await ValidateSession(p, existing, ct);
+            if (validation.IsSuccess)
+                return existing;
+                
+            await store.RemoveAsync(provider, ct);
+
+            return await PerformLogin(p, ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
-
+    
     /// <summary>
     /// Logs out from the specified provider and removes its persisted session.
     /// </summary>
@@ -68,4 +93,31 @@ internal sealed class AuthService(
     /// <returns>The <see cref="AuthSession"/> if found; otherwise, <c>null</c>.</returns>
     public Task<AuthSession?> GetAsync(string provider, CancellationToken ct = default)
         => store.GetAsync(provider, ct);
+    
+    private IAuthProvider GetProvider(string provider) => !_providers.TryGetValue(provider, out var p)
+        ? throw new InvalidOperationException($"Provider '{provider}' not registered") : p;
+    
+    private async Task<AuthSession> PerformLogin(IAuthProvider provider, CancellationToken ct)
+    {
+        var session = await provider.LoginAsync(ct);
+        await store.SaveAsync(session, ct);
+        return session;
+    }
+    
+    private static async Task<Result> ValidateSession(IAuthProvider provider, AuthSession session, CancellationToken ct)
+    {
+        try
+        {
+            if (provider is not IValidatableAuthProvider validatable) return Result.Success();
+            var ok = await validatable.ValidateTokenAsync(session.AccessToken, ct);
+            return ok 
+                ? Result.Success() 
+                : Result.Failure("Token validation failed or expired");
+
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure("Exception during token validation", ex);
+        }
+    }
 }

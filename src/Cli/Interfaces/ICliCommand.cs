@@ -3,24 +3,40 @@ using System.CommandLine;
 namespace ChangeTrace.Cli.Interfaces;
 
 /// <summary>
-/// Represents a CLI command definition.
+/// Defines CLI command specification used to construct the command tree.
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item>Responsible for constructing a <see cref="Command"/> instance for the CLI parser.</item>
-/// <item>Exposes the <see cref="HandlerType"/> that will handle execution of this command.</item>
+/// <item>Responsible for building <see cref="Command"/> instance.</item>
+/// <item>Optionally declares a parent command via <see cref="Parent"/> to support hierarchical composition.</item>
+/// <item>Exposes <see cref="HandlerType"/> used to resolve and attach  command handler from DI container.</item>
+/// <item>Consumed by the CLI composition pipeline to dynamically construct the full command tree.</item>
 /// </list>
 /// </remarks>
 internal interface ICliCommand
 {
     /// <summary>
-    /// Builds the <see cref="Command"/> instance for this CLI command.
+    /// Gets the parent command definition type.
     /// </summary>
-    /// <returns>A fully configured <see cref="Command"/> ready for registration with parser.</returns>
-    Command Build();
-
+    /// <remarks>
+    /// When <c>null</c>, the command is registered at the root level.
+    /// </remarks>
+    Type? Parent { get; }  
+    
     /// <summary>
-    /// Gets the <see cref="Type"/> of handler responsible for executing this command.
+    /// Gets the <see cref="Type"/> of the handler responsible for executing this command.
     /// </summary>
+    /// <remarks>
+    /// When <c>null</c>, the command does not attach handler directly
+    /// (for example, grouping or container commands).
+    /// </remarks>
     Type? HandlerType { get; }
+    
+    /// <summary>
+    /// Builds the <see cref="Command"/> instance representing this CLI command.
+    /// </summary>
+    /// <returns>
+    /// A configured <see cref="Command"/> ready to be composed into the command tree.
+    /// </returns>
+    Command Build();
 }

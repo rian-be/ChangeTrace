@@ -24,7 +24,8 @@ internal sealed class LoginCommand : ICliCommand
     /// Gets the type of the handler responsible for executing this command.
     /// </summary>
     public Type HandlerType => typeof(LoginCommandHandler);
-
+    public Type Parent => typeof(AuthCommand);
+    
     /// <summary>
     /// Builds the <see cref="Command"/> instance representing the 'login' command.
     /// </summary>

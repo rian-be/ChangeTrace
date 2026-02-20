@@ -26,6 +26,8 @@ internal sealed class LogoutCommand : ICliCommand
     /// </summary>
     public Type HandlerType => typeof(LogoutCommandHandler);
 
+    public Type Parent => typeof(AuthCommand);
+    
     /// <summary>
     /// Builds the <see cref="Command"/> instance representing the 'logout' CLI command.
     /// </summary>
