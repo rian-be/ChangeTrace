@@ -1,9 +1,9 @@
 using ChangeTrace.Configuration;
-using ChangeTrace.Core;
-using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.Configuration.Discovery;
+using ChangeTrace.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ChangeTrace.GIt.Services;
+namespace ChangeTrace.Core.Services;
 
 /// <summary>
 /// Simple file manager for timelines.
@@ -37,6 +37,26 @@ internal sealed class FileManager : IFileManager
     public Task<byte[]> LoadAsync(string path, CancellationToken cancellationToken = default)
         => File.ReadAllBytesAsync(path, cancellationToken);
 
+    /// <summary>
+    /// Checks if file exists at path.
+    /// </summary>
+    /// <param name="path">File path to check.</param>
+    public bool Exists(string path) => File.Exists(path);
+
+    /// <summary>
+    /// Reads all text from file or returns fallback if missing.
+    /// </summary>
+    /// <param name="path">File path to read.</param>
+    /// <param name="fallback">Fallback text.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<string> ReadAllTextAsync(string path, string fallback = "", CancellationToken ct = default)
+    {
+        if (!Exists(path))
+            return fallback;
+
+        return await File.ReadAllTextAsync(path, ct);
+    }
+    
     /// <summary>
     /// Ensures that the given path ends with the specified extension.
     /// If not, appends the extension.

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Results;
 using ChangeTrace.CredentialTrace.Interfaces;
 using Microsoft.Extensions.DependencyInjection;

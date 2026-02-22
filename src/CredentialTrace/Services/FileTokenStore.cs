@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 

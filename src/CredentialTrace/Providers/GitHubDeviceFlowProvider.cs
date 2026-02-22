@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Dto;
 using ChangeTrace.CredentialTrace.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,7 +23,7 @@ namespace ChangeTrace.CredentialTrace.Providers;
 /// </list>
 /// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
-internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IAuthProvider, IValidatableAuthProvider
+internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IValidatableAuthProvider
 {
     private const string ClientId = "Ov23liZADv3yvX37gzcw";
 
@@ -43,11 +44,7 @@ internal sealed class GitHubDeviceFlowProvider(HttpClient http) : IAuthProvider,
 
         var token = await PollAccessToken(device, ct);
 
-        return new AuthSession(
-            Provider: Name,
-            AccessToken: token.access_token,
-            Username: null,
-            CreatedAt: DateTimeOffset.UtcNow);
+        return AuthSession.Create("github", token.access_token, null);
     }
 
     public async Task<bool> ValidateTokenAsync(string token, CancellationToken ct = default)

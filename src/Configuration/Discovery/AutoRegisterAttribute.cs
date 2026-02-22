@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ChangeTrace.Configuration;
+namespace ChangeTrace.Configuration.Discovery;
 
 /// <summary>
 /// Marks a class for automatic DI registration.

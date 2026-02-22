@@ -1,4 +1,4 @@
-namespace ChangeTrace.GIt.Interfaces;
+namespace ChangeTrace.Core.Interfaces;
 
 /// <summary>
 /// Abstraction over file system operations for timeline storage.
@@ -23,6 +23,22 @@ internal interface IFileManager
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Byte array content of the file.</returns>
     Task<byte[]> LoadAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if file exists at path.
+    /// </summary>
+    /// <param name="path">File path to check.</param>
+    /// <returns>True if file exists, false otherwise.</returns>
+    bool Exists(string path);
+
+    /// <summary>
+    /// Reads all text from file.
+    /// Returns fallback if file is missing or empty.
+    /// </summary>
+    /// <param name="path">File path to read.</param>
+    /// <param name="fallback">Fallback text if missing.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<string> ReadAllTextAsync(string path, string fallback = "", CancellationToken ct = default);
 
     /// <summary>
     /// Ensures the provided path has the specified file extension.

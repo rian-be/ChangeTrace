@@ -54,10 +54,37 @@ internal static class ServiceDiscoveryExtensions
 
             foreach (var iface in interfaces)
             {
-                services.Add(new ServiceDescriptor(iface, type, attr.Lifetime));
+                if (type.IsGenericTypeDefinition)
+                {
+                    if (!iface.IsGenericType)
+                        continue;
 
-                if (enableLogging)
-                    logger.LogInformation("DI Register {Interface} -> {Implementation}", iface.FullName, type.FullName);
+                    var serviceType = iface.GetGenericTypeDefinition();
+
+                    services.Add(new ServiceDescriptor(
+                        serviceType,
+                        type,
+                        attr.Lifetime));
+
+                    if (enableLogging)
+                        logger.LogInformation(
+                            "DI Register OPEN {Service} -> {Implementation}",
+                            serviceType.FullName,
+                            type.FullName);
+                }
+                else
+                {
+                    services.Add(new ServiceDescriptor(
+                        iface,
+                        type,
+                        attr.Lifetime));
+
+                    if (enableLogging)
+                        logger.LogInformation(
+                            "DI Register {Service} -> {Implementation}",
+                            iface.FullName,
+                            type.FullName);
+                }
             }
         }
 
