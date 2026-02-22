@@ -20,7 +20,7 @@ namespace ChangeTrace.Cli.Handlers.Auth;
 /// <item>Handles login errors and displays formatted error panel.</item>
 /// </list>
 /// </remarks>
-[AutoRegister(ServiceLifetime.Singleton)]
+[AutoRegister(ServiceLifetime.Transient, typeof(LoginCommandHandler))]
 internal sealed class LoginCommandHandler(IAuthService auth) : ICliHandler
 {
     /// <summary>

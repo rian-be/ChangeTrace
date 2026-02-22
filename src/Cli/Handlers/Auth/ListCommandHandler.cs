@@ -20,7 +20,7 @@ namespace ChangeTrace.Cli.Handlers.Auth;
 /// <item>Handles case where no providers are authenticated and prints message.</item>
 /// </list>
 /// </remarks>
-[AutoRegister(ServiceLifetime.Singleton)]
+[AutoRegister(ServiceLifetime.Transient, typeof(ListCommandHandler))]
 internal sealed class ListCommandHandler(IAuthService auth) : ICliHandler
 {
     /// <summary>

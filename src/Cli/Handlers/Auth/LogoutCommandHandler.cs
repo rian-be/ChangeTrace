@@ -1,6 +1,8 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace ChangeTrace.Cli.Handlers.Auth;
@@ -17,6 +19,7 @@ namespace ChangeTrace.Cli.Handlers.Auth;
 /// <item>Does not create or modify login sessions beyond removal.</item>
 /// </list>
 /// </remarks>
+[AutoRegister(ServiceLifetime.Transient, typeof(LogoutCommandHandler))]
 internal sealed class LogoutCommandHandler(IAuthService auth) : ICliHandler
 {
     /// <summary>

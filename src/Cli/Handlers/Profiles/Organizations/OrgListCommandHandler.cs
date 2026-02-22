@@ -1,7 +1,10 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
+using ChangeTrace.Configuration.Discovery;
+using ChangeTrace.CredentialTrace.Interfaces;
 using ChangeTrace.CredentialTrace.Profiles;
 using ChangeTrace.CredentialTrace.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace ChangeTrace.Cli.Handlers.Profiles.Organizations;
@@ -18,6 +21,7 @@ namespace ChangeTrace.Cli.Handlers.Profiles.Organizations;
 /// <item>Handles cases where no organizations exist or no organizations match the given provider.</item>
 /// </list>
 /// </remarks>
+[AutoRegister(ServiceLifetime.Transient, typeof(OrgListCommandHandler))]
 internal sealed class OrgListCommandHandler(
     IProfileStore<OrganizationProfile> store) : ICliHandler
 {

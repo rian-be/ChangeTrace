@@ -1,8 +1,10 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Interfaces;
 using ChangeTrace.CredentialTrace.Profiles;
 using ChangeTrace.CredentialTrace.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace ChangeTrace.Cli.Handlers.Profiles.Workspaces;
@@ -18,6 +20,7 @@ namespace ChangeTrace.Cli.Handlers.Profiles.Workspaces;
 /// <item>Displays a confirmation panel with workspace and organization details on success.</item>
 /// </list>
 /// </remarks>
+[AutoRegister(ServiceLifetime.Transient, typeof(WorkUseCommandHandler))]
 internal sealed class WorkUseCommandHandler(
     IProfileStore<OrganizationProfile> orgStore,
     IProfileStore<WorkspaceProfile> workspaceStore,

@@ -1,7 +1,9 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
+using ChangeTrace.Configuration.Discovery;
+using ChangeTrace.CredentialTrace.Interfaces;
 using ChangeTrace.CredentialTrace.Profiles;
-using ChangeTrace.CredentialTrace.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace ChangeTrace.Cli.Handlers.Profiles.Workspaces;
@@ -18,6 +20,7 @@ namespace ChangeTrace.Cli.Handlers.Profiles.Workspaces;
 /// <item>Displays a confirmation panel with workspace and organization details on success.</item>
 /// </list>
 /// </remarks>
+[AutoRegister(ServiceLifetime.Transient, typeof(WorkCreateCommandHandler))]
 internal sealed class WorkCreateCommandHandler(
     IProfileStore<OrganizationProfile> orgStore,
     IProfileStore<WorkspaceProfile> workspaceStore) : ICliHandler
@@ -38,30 +41,41 @@ internal sealed class WorkCreateCommandHandler(
             return;
         }
 
-        var org = await orgStore.GetByNameAsync(orgName, ct);
-        if (org == null)
-        {
-            AnsiConsole.MarkupLine($"[red]Organization '{orgName}' not found[/]");
-            return;
-        }
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .SpinnerStyle(Style.Parse("green"))
+            .StartAsync("Creating workspace...", async ctx =>
+            {
+                ctx.Status("Validating organization...");
 
-        var allWorkspaces = await workspaceStore.GetAllAsync(ct);
-        var existing = allWorkspaces
-            .FirstOrDefault(w =>
-                w.OrganizationId == org.Id &&
-                w.Name.Equals(wsName, StringComparison.OrdinalIgnoreCase));
+                var org = await orgStore.GetByNameAsync(orgName, ct);
+                if (org == null)
+                {
+                    AnsiConsole.MarkupLine($"[red]Organization '{orgName}' not found[/]");
+                    return;
+                }
 
-        if (existing != null)
-        {
-            AnsiConsole.MarkupLine(
-                $"[yellow]Workspace '{wsName}' already exists in organization '{orgName}'[/]");
-            return;
-        }
+                ctx.Status("Checking existing workspaces...");
+                var allWorkspaces = await workspaceStore.GetAllAsync(ct);
+                var existing = allWorkspaces
+                    .FirstOrDefault(w =>
+                        w.OrganizationId == org.Id &&
+                        w.Name.Equals(wsName, StringComparison.OrdinalIgnoreCase));
 
-        var workspace = WorkspaceProfile.Create(org.Id, wsName);
-        await workspaceStore.SaveAsync(workspace, ct);
+                if (existing != null)
+                {
+                    AnsiConsole.MarkupLine(
+                        $"[yellow]Workspace '{wsName}' already exists in organization '{orgName}'[/]");
+                    return;
+                }
 
-        DisplayConfirmation(workspace, org);
+                ctx.Status("Saving new workspace...");
+                var workspace = WorkspaceProfile.Create(org.Id, wsName);
+                await workspaceStore.SaveAsync(workspace, ct);
+
+                ctx.Status("Done!");
+                DisplayConfirmation(workspace, org);
+            });
     }
 
     /// <summary>

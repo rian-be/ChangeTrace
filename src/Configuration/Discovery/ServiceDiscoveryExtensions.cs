@@ -87,8 +87,9 @@ internal static class ServiceDiscoveryExtensions
                 }
             }
         }
-
-        logger.LogInformation("Service discovery registered {Count} services", serviceTypes.Count);
+        
+        if (enableLogging)
+             logger.LogInformation("Service discovery registered {Count} services", serviceTypes.Count);
     }
 
     private static void LoadAllAssemblies()
