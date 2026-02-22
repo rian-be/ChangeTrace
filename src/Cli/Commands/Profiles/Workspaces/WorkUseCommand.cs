@@ -2,6 +2,7 @@ using System.CommandLine;
 using ChangeTrace.Cli.Handlers.Profiles.Workspaces;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Commands.Profiles.Workspaces;
@@ -37,7 +38,7 @@ internal sealed class WorkUseCommand : ICliCommand
     /// <returns>A configured <see cref="Command"/> with required arguments and optional organization filter.</returns>
     public Command Build() => new("use", "Select workspace to play")
     {
-        new Argument<string>("name") { Description = "Workspace name" },
-        new Option<string>("--org") { Description = "Organization name" }
+        new Argument<string>("org") { Description = "Organization name" },
+        new Argument<string>("name") { Description = "Workspace name" }
     };
 }

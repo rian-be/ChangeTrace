@@ -1,6 +1,7 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Commands.Auth;
@@ -25,8 +26,6 @@ namespace ChangeTrace.Cli.Commands.Auth;
 [AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class AuthCommand : ICliCommand
 {
-    public string Name => "auth";
-    
     /// <summary>
     /// Gets the handler type responsible for executing this command.
     /// Returns <c>null</c> since execution is delegated to subcommands.
@@ -40,5 +39,5 @@ internal sealed class AuthCommand : ICliCommand
     /// </summary>
     /// <returns>A configured <see cref="Command"/> with subcommands for login, logout, and list.</returns>
     public Command Build()
-        => new(Name, "Auth management");
+        => new("auth", "Auth management");
 }

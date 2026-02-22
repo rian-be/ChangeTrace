@@ -2,6 +2,7 @@ using System.CommandLine;
 using ChangeTrace.Cli.Handlers.Profiles.Workspaces;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Commands.Profiles.Workspaces;

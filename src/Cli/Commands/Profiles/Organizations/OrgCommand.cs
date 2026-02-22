@@ -1,6 +1,7 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Commands.Profiles.Organizations;

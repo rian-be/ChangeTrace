@@ -1,6 +1,7 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace;
 using ChangeTrace.CredentialTrace.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
