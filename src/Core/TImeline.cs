@@ -46,19 +46,19 @@ internal sealed class Timeline(string? name = null, RepositoryId? repositoryId =
     /// <summary>
     /// Normalize all timestamps relative to first event
     /// </summary>
-    internal Result Normalize()
+    internal Result Normalize(double targetDurationSeconds = 300.0)
     {
         if (_events.Count == 0)
             return Result.Failure("Cannot normalize empty timeline");
 
-        // Sort by timestamp
         _events.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
 
-        var baseTime = _events[0].Timestamp;
+        var baseTime     = _events[0].Timestamp;
+        var originalSpan = _events[^1].Timestamp.UnixSeconds - baseTime.UnixSeconds;
+        var scale        = originalSpan > 1e-9 ? targetDurationSeconds / originalSpan : 1.0;
+
         foreach (var evt in _events)
-        {
-            evt.NormalizeTime(baseTime);
-        }
+            evt.NormalizeTime(baseTime, scale);
 
         _isNormalized = true;
         return Result.Success();

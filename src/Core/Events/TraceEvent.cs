@@ -11,7 +11,7 @@ namespace ChangeTrace.Core.Events;
 internal sealed class TraceEvent
 {
     // Core properties
-    internal Timestamp Timestamp { get; private set; }
+    internal Timestamp Timestamp { get; set; }
     internal ActorName Actor { get; }
     public string Target { get; }
     public string? Metadata { get; private set; }
@@ -79,15 +79,10 @@ internal sealed class TraceEvent
 
         return Result.Success();
     }
-
-    /// <summary>
-    /// Normalize timestamp relative to base time
-    /// </summary>
-    internal void NormalizeTime(Timestamp baseTime)
-    {
-        Timestamp = Timestamp.Normalize(baseTime);
-    }
-
+    
+    internal void NormalizeTime(Timestamp baseTime, double scale = 1.0) =>
+        Timestamp = Timestamp.Normalize(baseTime, scale: scale);
+    
     internal void AddContributor(ActorName actor, Timestamp time)
     {
         if (Contributors == null) Contributors = new List<ActorName>();
@@ -110,7 +105,7 @@ internal sealed class TraceEvent
     /// <summary>
     /// Get human-readable event type
     /// </summary>
-    internal string GetEventType() => (PrType, BranchType, CommitType) switch
+    private string GetEventType() => (PrType, BranchType, CommitType) switch
     {
         (not null, _, _) => $"PR:{PrType}",
         (_, not null, _) => $"Branch:{BranchType}",

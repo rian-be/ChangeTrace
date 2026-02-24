@@ -21,7 +21,7 @@ internal readonly struct Timestamp : IComparable<Timestamp>
     private DateTimeOffset DateTime => DateTimeOffset.FromUnixTimeSeconds(UnixSeconds);
 
     private Timestamp(long unixSeconds) => UnixSeconds = unixSeconds;
-
+    private Timestamp(double unixSeconds) => UnixSeconds = (long)unixSeconds; 
     /// <summary>
     /// Creates <see cref="Timestamp"/> from Unix seconds.
     /// Returns failure if out of range (0–4102444800).
@@ -54,9 +54,9 @@ internal readonly struct Timestamp : IComparable<Timestamp>
     /// </summary>
     /// <param name="baseTime">Base timestamp</param>
     /// <returns>Normalized timestamp (difference in seconds)</returns>
-    public Timestamp Normalize(Timestamp baseTime)
-        => new(UnixSeconds - baseTime.UnixSeconds);
-
+    public Timestamp Normalize(Timestamp baseTime, double scale = 1.0)
+        => new((UnixSeconds - baseTime.UnixSeconds) * scale); 
+    
     /// <summary>
     /// Compares this timestamp with another.
     /// </summary>
