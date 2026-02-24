@@ -1,4 +1,5 @@
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;

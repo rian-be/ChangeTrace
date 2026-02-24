@@ -1,4 +1,3 @@
-using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.GIt.Options;

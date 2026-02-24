@@ -1,8 +1,13 @@
+using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
+using ChangeTrace.GIt.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Octokit;
 
 namespace ChangeTrace.GIt.Enrichers;
@@ -16,13 +21,15 @@ namespace ChangeTrace.GIt.Enrichers;
 /// Matches PRs against commits or branches in the timeline and attaches PR metadata.
 /// Handles pagination, API rate limits, and errors gracefully.
 /// </remarks>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class GitHubEnricher : BasePlatformEnricher
 {
     private readonly GitHubClient _client;
     
-    internal GitHubEnricher(string? githubToken, ILogger<GitHubEnricher> logger)
+    public GitHubEnricher(IOptions<ExportOptions> options,  ILogger<GitHubEnricher> logger)
         : base(logger)
     {
+        var githubToken = options.Value.GitHubToken;
         _client = new GitHubClient(new ProductHeaderValue("ChangeTrace"));
 
         if (!string.IsNullOrEmpty(githubToken))

@@ -1,9 +1,12 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
-using ChangeTrace.Core;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using ChangeTrace.Configuration.Discovery;
+using ChangeTrace.Core.Events;
 using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.Player.Enums;
+using ChangeTrace.Player.Factory;
+using ChangeTrace.Player.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Handlers;
 
@@ -11,9 +14,12 @@ namespace ChangeTrace.Cli.Handlers;
 /// CLI handler to read a .gittrace MessagePack file and display its content as JSON.
 /// TEMP
 /// </summary>
+[AutoRegister(ServiceLifetime.Transient, typeof(ShowTimelineCommandHandler))]
 internal sealed class ShowTimelineCommandHandler(
-    ITimelineSerializer serializer) : ICliHandler
+    ITimelineSerializer serializer,
+    ITimelinePlayerFactory playerFactory): ICliHandler
 {
+
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
         var filePath = parseResult.GetValue<string>("file")!;
@@ -27,85 +33,58 @@ internal sealed class ShowTimelineCommandHandler(
         {
             var data = await File.ReadAllBytesAsync(filePath, ct);
             var timeline = await serializer.DeserializeAsync(data, ct);
+            
+            var player = playerFactory.Create(
+                timeline,
+                PlaybackMode.Loop,
+                initialSpeed: 1.5,
+                acceleration: 2.5);
+            
+            ConfigurePlayer(player);
 
-            var json = JsonSerializer.Serialize(
-                TimelineJsonDto.FromTimeline(timeline), 
-                new JsonSerializerOptions { WriteIndented = true });
+            player.OnEvent += OnTraceEvent;
+            player.OnStateChanged += s => Console.WriteLine($"\n  ← STATE → {s}");
+            ThrottledProgress(player);
+            player.OnLoopCompleted += n =>
+            {
+                Console.WriteLine($"\n  ← LOOP #{n} completed");
+                Console.WriteLine(player.GetDiagnostics());
+            };
 
-            Console.WriteLine(json);
+            player.Play();
+            //player.SeekRelative(52552);
+            while (player.State == PlayerState.Playing)
+                await Task.Delay(10, ct);
+
+            Console.WriteLine("\nPlayback finished.");
+           // Console.WriteLine(player.GetDiagnostics());
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[red]Failed to read or deserialize file: {ex.Message}[/]");
         }
     }
-}
 
-/// <summary>
-/// Helper DTO for JSON display (map Timeline to serializable structure)
-/// </summary>
-internal sealed record TimelineJsonDto
-{
-    public string? Name { get; init; }
-    public string? Repository { get; init; }
-    public List<TraceEventJsonDto> Events { get; init; } = [];
-
-    public static TimelineJsonDto FromTimeline(Timeline timeline)
+    private static void OnTraceEvent(TraceEvent evt)
     {
-        return new TimelineJsonDto
-        {
-            Name = timeline.Name,
-            Repository = timeline.RepositoryId?.ToString(),
-            Events = timeline.Events.Select(TraceEventJsonDto.FromTraceEvent).ToList()
-        };
+        Console.WriteLine(evt.ToString());
+        //Console.WriteLine($"evt  {evt.Timestamp.UnixSeconds}  {evt.Actor.Value} → {evt.Target}");
     }
-}
-
-internal sealed record TraceEventJsonDto
-{
-    public long timestamp { get; init; }
-    public string actor { get; init; } = "";
-    public string target { get; init; } = "";
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? metadata { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? commitSha { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? filePath { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? commitType { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? branchName { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? branchType { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? pullRequestNumber { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? prType { get; init; }
-
-    public static TraceEventJsonDto FromTraceEvent(Core.Events.TraceEvent evt)
+    private static void ConfigurePlayer(ITimelinePlayer player)
     {
-        return new TraceEventJsonDto
+        player.TargetSpeed = 0.1;
+        player.Acceleration = 0.1;
+        player.ApplyPreset(SpeedPreset.Normal);
+    }
+
+    private static void ThrottledProgress(ITimelinePlayer player)
+    {
+        double lastProgress = -1;
+        player.OnProgress += p =>
         {
-            timestamp = evt.Timestamp.UnixSeconds,
-            actor = evt.Actor.Value,
-            target = evt.Target,
-            metadata = evt.Metadata,
-            commitSha = evt.CommitSha?.Value,
-            filePath = evt.FilePath?.Value,
-            commitType = evt.CommitType?.ToString(),
-            branchName = evt.BranchName?.Value,
-            branchType = evt.BranchType?.ToString(),
-            pullRequestNumber = evt.PullRequestNumber?.Value,
-            prType = evt.PrType?.ToString()
+            if (!(Math.Abs(p - lastProgress) >= 0.01)) return; // update every 1%
+            Console.Write($"\r  progress {p:P1}   ");
+            lastProgress = p;
         };
     }
 }

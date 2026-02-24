@@ -1,5 +1,6 @@
 using ChangeTrace.Core;
 using ChangeTrace.Core.Events;
+using MessagePack;
 using Model = ChangeTrace.Core.Models;
 
 namespace ChangeTrace.GIt.Dto;
@@ -13,11 +14,19 @@ namespace ChangeTrace.GIt.Dto;
 /// 
 /// Provides conversion methods <see cref="FromDomain"/> and <see cref="ToDomain"/> for mapping between domain and DTO.
 /// </remarks>
+[MessagePackObject(AllowPrivate = true)]
 internal sealed record TimelineDto
 {
+    [Key(0)]
     internal string? Name { get; init; }
+
+    [Key(1)]
     internal RepositoryIdDto? RepositoryId { get; init; }
+
+    [Key(2)]
     internal List<TraceEventDto> Events { get; init; } = [];
+
+    [Key(3)]
     internal bool IsNormalized { get; init; }
 
     internal static TimelineDto FromDomain(Timeline timeline)

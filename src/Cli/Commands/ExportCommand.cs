@@ -2,6 +2,7 @@ using System.CommandLine;
 using ChangeTrace.Cli.Handlers;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Commands;
@@ -24,7 +25,8 @@ internal sealed class ExportCommand : ICliCommand
     /// Gets the handler type responsible for executing this command.
     /// </summary>
     public Type HandlerType => typeof(ExportCommandHandler);
-
+    public Type? Parent => null;
+    
     /// <summary>
     /// Builds the <see cref="Command"/> instance representing the 'export' CLI command.
     /// </summary>

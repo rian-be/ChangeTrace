@@ -1,5 +1,7 @@
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
+using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Results;
 using ChangeTrace.GIt.Interfaces;
 using Microsoft.Extensions.DependencyInjection;

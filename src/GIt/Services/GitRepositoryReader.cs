@@ -1,4 +1,5 @@
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
@@ -35,9 +36,7 @@ internal sealed class GitRepositoryReader(ILogger<GitRepositoryReader> logger) :
 
                 using var repo = new Repository(repositoryPath);
                 
-                // Build branch map FIRST - map commit SHA to branches
                 var commitToBranches = BuildCommitToBranchMap(repo);
-                
                 var commits = new List<CommitData>();
 
                 var filter = new CommitFilter
@@ -103,21 +102,16 @@ internal sealed class GitRepositoryReader(ILogger<GitRepositoryReader> logger) :
                 continue;
 
             var branchName = branch.FriendlyName;
-            
-            // Add tip commit
-            AddToMap(map, branch.Tip.Sha, branchName);
 
-            // For each branch, walk back through its commits
-            // This ensures we know which branches contain which commits
+            AddToMap(map, branch.Tip.Sha, branchName);
             var filter = new CommitFilter
             {
                 IncludeReachableFrom = branch.Tip,
                 SortBy = CommitSortStrategies.Topological
             };
-
-            // Only walk back a reasonable distance to avoid performance issues
+            
             int walkCount = 0;
-            const int maxWalk = 1000; // Configurable limit
+            const int maxWalk = 1000;
 
             foreach (var commit in repo.Commits.QueryBy(filter))
             {
@@ -133,11 +127,11 @@ internal sealed class GitRepositoryReader(ILogger<GitRepositoryReader> logger) :
         return map;
     }
 
-    private void AddToMap(Dictionary<string, List<string>> map, string sha, string branchName)
+    private static void AddToMap(Dictionary<string, List<string>> map, string sha, string branchName)
     {
         if (!map.ContainsKey(sha))
         {
-            map[sha] = new List<string>();
+            map[sha] = [];
         }
         
         if (!map[sha].Contains(branchName))

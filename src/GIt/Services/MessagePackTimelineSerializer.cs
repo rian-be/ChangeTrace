@@ -1,4 +1,5 @@
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.GIt.Dto;
 using ChangeTrace.GIt.Interfaces;

@@ -1,3 +1,5 @@
+using MessagePack;
+
 namespace ChangeTrace.GIt.Dto;
 
 /// <summary>
@@ -8,7 +10,5 @@ namespace ChangeTrace.GIt.Dto;
 /// - `Owner` corresponds to repository owner (user or organization).  
 /// - `Name` corresponds to repository name.  
 /// </remarks>
-internal sealed record RepositoryIdDto(
-    string Owner,
-    string Name
-);
+[MessagePackObject(AllowPrivate = true)]
+internal sealed record RepositoryIdDto([property: Key(0)] string Owner, [property: Key(1)] string Name);

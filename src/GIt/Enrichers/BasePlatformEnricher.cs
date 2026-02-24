@@ -1,9 +1,11 @@
+using ChangeTrace.Configuration;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.GIt.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.GIt.Enrichers;
@@ -17,6 +19,7 @@ namespace ChangeTrace.GIt.Enrichers;
 /// 
 /// All concrete enrichers must implement <see cref="EnrichAsync"/>.
 /// </remarks>
+
 internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
 {
     /// <summary>

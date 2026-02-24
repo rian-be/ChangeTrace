@@ -33,13 +33,15 @@ namespace ChangeTrace.GIt.Options;
 /// <param name="TimelineName">
 /// Optional name for the exported timeline.
 /// </param>
-internal sealed record ExportOptions(
-    bool IncludeFileChanges = true,
-    bool IncludeBranchEvents = true,
-    bool IncludeMergeDetection = true,
-    bool EnrichWithPullRequests = true,
-    int MaxCommits = 0,
-    DateTimeOffset? StartDate = null,
-    DateTimeOffset? EndDate = null,
-    string? TimelineName = null
-);
+internal sealed record ExportOptions
+{
+    public string? GitHubToken { get; init; }
+    public bool IncludeFileChanges { get; init; } = true;
+    public bool IncludeBranchEvents { get; init; } = true;
+    public bool IncludeMergeDetection { get; init; } = true;
+    public bool EnrichWithPullRequests { get; init; } = true;
+    public int MaxCommits { get; init; } = 0;
+    public DateTimeOffset? StartDate { get; init; }
+    public DateTimeOffset? EndDate { get; init; }
+    public string? TimelineName { get; init; }
+}

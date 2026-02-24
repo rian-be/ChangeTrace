@@ -1,9 +1,9 @@
 using ChangeTrace.Configuration;
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Results;
-using ChangeTrace.Core.Services;
 using ChangeTrace.GIt.Delegates;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
@@ -20,7 +20,7 @@ namespace ChangeTrace.GIt.Services;
 [AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class RepositoryExporter(
     IGitRepositoryReader gitReader,
-    TimelineBuilder timelineBuilder,
+    ITimelineBuilder timelineBuilder,
     ITimelineRepository repository,
     ILogger<RepositoryExporter> logger,
     ITimelineEnricher? githubEnricher = null) : IRepositoryExporter
@@ -46,7 +46,7 @@ internal sealed class RepositoryExporter(
         {
             logger.LogInformation("Starting export: {Path}", pathOrUrl);
 
-            // Step 1: Get repository path (clone if URL)
+            // Step 1: Get repository path
             progress?.Invoke("Prepare", 0, 4, "Preparing repository...");
             var pathResult = await GetRepositoryPathAsync(pathOrUrl, cancellationToken);
             if (pathResult.IsFailure)
