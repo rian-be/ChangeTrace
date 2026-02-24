@@ -82,16 +82,4 @@ internal sealed class SeekableTimeline : ISeekable
         }
         return Result.Success();
     }
-
-    /// <summary>
-    /// Computes timeline duration from first and last event timestamps.
-    /// </summary>
-    /// <param name="timeline">Timeline to measure.</param>
-    /// <returns>Total duration in seconds.</returns>
-    private static double ComputeDuration(Timeline timeline)
-    {
-        if (timeline.Count == 0) return 0;
-        var stats = timeline.GetStatistics();
-        return stats.EndTime.UnixSeconds - stats.StartTime.UnixSeconds;
-    }
 }
