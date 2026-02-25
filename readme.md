@@ -1,6 +1,7 @@
 # ChangeTrace
 
 [![C#](https://img.shields.io/badge/language-C%23-blue)](https://docs.microsoft.com/dotnet/csharp/) [![.NET](https://img.shields.io/badge/framework-.NET%2010-purple)](https://dotnet.microsoft.com/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Build](https://img.shields.io/badge/build-passing-brightgreen)]() [![Version](https://img.shields.io/badge/version-0.6.54-orange)]()
+
 **CLI tool for Git history analysis and commit visualization.**
 
 ---
