@@ -38,7 +38,7 @@ internal sealed class TimelineStepper(IEventCursor cursor, IVirtualClock clock, 
         var (evt, moved) = _cursor.TryStepForward();
         if (!moved) return Result.Failure("Already at end.");
 
-        _clock.SnapPosition(evt!.Timestamp.UnixSeconds);
+        _clock.SnapPosition(evt!.TimeForPlayback);
         onEvent?.Invoke(evt);
         return Result.Success();
     }
@@ -49,13 +49,12 @@ internal sealed class TimelineStepper(IEventCursor cursor, IVirtualClock clock, 
     /// <returns>Success if cursor moved, failure if at beginning or timeline empty.</returns>
     public Result StepBackward()
     {
-        if (_cursor.TotalEvents == 0)
-            return Result.Failure("Timeline is empty.");
+        if (_cursor.TotalEvents == 0) return Result.Failure("Timeline is empty.");
 
         var (evt, moved) = _cursor.TryStepBackward();
         if (!moved) return Result.Failure("Already at beginning.");
 
-        _clock.SnapPosition(evt!.Timestamp.UnixSeconds);
+        _clock.SnapPosition(evt!.TimeForPlayback);
         onEvent?.Invoke(evt);
         return Result.Success();
     }

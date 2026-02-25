@@ -55,10 +55,10 @@ internal sealed class Timeline(string? name = null, RepositoryId? repositoryId =
 
         var baseTime     = _events[0].Timestamp;
         var originalSpan = _events[^1].Timestamp.UnixSeconds - baseTime.UnixSeconds;
-        var scale        = originalSpan > 1e-9 ? targetDurationSeconds / originalSpan : 1.0;
+        var scale = originalSpan > 1e-9 ? targetDurationSeconds / originalSpan : 1.0;
 
         foreach (var evt in _events)
-            evt.NormalizeTime(baseTime, scale);
+            evt.ComputeRelativeTime(baseTime, scale);
 
         _isNormalized = true;
         return Result.Success();

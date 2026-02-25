@@ -93,8 +93,13 @@ internal sealed class EventCursor : IEventCursor
 
     /// <summary>Gets timestamp of event at given index, or <c>double.MaxValue</c> if out of range.</summary>
     private double TimeOf(int idx)
-        => (idx >= 0 && idx < _events.Count) ? _events[idx].Timestamp.UnixSeconds : double.MaxValue;
+    {
+        if (idx < 0 || idx >= _events.Count)
+            return double.MaxValue;
 
+        return _events[idx].TimeForPlayback;
+    }
+    
     /// <summary>Binary search for first event at or after target timestamp.</summary>
     private int BinarySearch(double target)
     {

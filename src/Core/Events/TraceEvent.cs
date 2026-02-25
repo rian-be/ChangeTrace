@@ -34,6 +34,13 @@ internal sealed class TraceEvent
     public BranchEventType? BranchType { get; }
     public PullRequestEventType? PrType { get; private set; }
 
+    private Duration? RelativeTime { get; set; }
+         
+    /// <summary>
+    /// Returns the time for playback.
+    /// </summary>
+    internal double TimeForPlayback => RelativeTime?.TotalSeconds ?? Timestamp.UnixSeconds;
+    
     internal TraceEvent(
         Timestamp timestamp,
         ActorName actor,
@@ -83,12 +90,25 @@ internal sealed class TraceEvent
     internal void NormalizeTime(Timestamp baseTime, double scale = 1.0) =>
         Timestamp = Timestamp.Normalize(baseTime, scale: scale);
     
+    /// <summary>
+    /// Computes relative time from a base timestamp.
+    /// </summary>
+    /// <param name="baseTime">Base timestamp.</param>
+    /// <param name="scale">Optional scale factor.</param>
+    internal void ComputeRelativeTime(Timestamp baseTime, double scale = 1.0) =>
+        RelativeTime = Timestamp.Subtract(baseTime).Scale(scale);
+    
+    /// <summary>
+    /// Adds contributor to the event and updates last modified timestamp.
+    /// </summary>
+    /// <param name="actor">Contributor actor.</param>
+    /// <param name="time">Timestamp of contribution.</param>
     internal void AddContributor(ActorName actor, Timestamp time)
     {
-        if (Contributors == null) Contributors = new List<ActorName>();
+        Contributors ??= [];
         if (!Contributors.Contains(actor)) Contributors.Add(actor);
 
-        if (LastModified == null) LastModified = new Dictionary<ActorName, Timestamp>();
+        LastModified ??= new Dictionary<ActorName, Timestamp>();
         LastModified[actor] = time;
     }
     
