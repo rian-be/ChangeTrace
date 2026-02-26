@@ -1,4 +1,3 @@
-using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
@@ -31,7 +30,7 @@ internal sealed class RepositoryExporter(
     /// <param name="pathOrUrl">Local repository path or remote Git URL. Remote URLs are automatically cloned to a temporary location.</param>
     /// <param name="options">Options controlling export behavior (date filters, max commits, enrichment, etc.).</param>
     /// <param name="progress">Optional progress callback reporting operation name, current step, total steps, and status message.</param>
-    /// <param name="cancellationToken">Token to cancel the operation. Cleans up temporary resources if cancelled.</param>
+    /// <param name="cancellationToken">Token to cancel the operation. Cleans up temporary resources if canceled.</param>
     /// <returns>
     /// A <see cref="Result{Timeline}"/> containing the fully constructed and normalized timeline on success,
     /// or failure with error details (including exception if applicable).
@@ -48,7 +47,7 @@ internal sealed class RepositoryExporter(
 
             // Step 1: Get repository path
             progress?.Invoke("Prepare", 0, 4, "Preparing repository...");
-            var pathResult = await GetRepositoryPathAsync(pathOrUrl, cancellationToken);
+            var pathResult = await GetRepositoryPathStep(pathOrUrl, cancellationToken);
             if (pathResult.IsFailure)
                 return Result<Timeline>.Failure(pathResult.Error!);
 
@@ -56,80 +55,29 @@ internal sealed class RepositoryExporter(
             progress?.Invoke("Prepare", 1, 4, "Repository ready");
 
             // Step 2: Read commits
-            progress?.Invoke("Read", 1, 4, "Reading commits...");
-            var commitsResult = await gitReader.ReadCommitsAsync(
-                repoPath,
-                new GitReaderOptions(
-                    IncludeFileChanges: options.IncludeFileChanges,
-                    MaxCommits: options.MaxCommits,
-                    StartDate: options.StartDate,
-                    EndDate: options.EndDate
-                ),
-                cancellationToken
-            );
-
+            var commitsResult = await ReadCommitsStep(repoPath, options, progress, cancellationToken);
             if (commitsResult.IsFailure)
                 return Result<Timeline>.Failure(commitsResult.Error!);
 
             var commits = commitsResult.Value;
-            progress?.Invoke("Read", 2, 4, $"Read {commits.Count} commits");
-
+            
             // Step 3: Build timeline
-            progress?.Invoke("Build", 2, 4, "Building timeline...");
-            var repositoryId = ExtractRepositoryId(pathOrUrl);
-            var builderOptions = new TimelineBuilderOptions(
-                IncludeFileChanges: options.IncludeFileChanges,
-                IncludeBranchEvents: options.IncludeBranchEvents,
-                IncludeMergeDetection: options.IncludeMergeDetection,
-                Name: options.TimelineName,
-                RepositoryId: repositoryId
-            );
-
-            var timelineResult = timelineBuilder.Build(commits, builderOptions);
+            var timelineResult = BuildTimelineStep(commits, options, progress);
             if (timelineResult.IsFailure)
                 return Result<Timeline>.Failure(timelineResult.Error!);
-
+            
             var timeline = timelineResult.Value;
             progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
 
-            // Step 4: Enrich with PR data (optional)
-            if (options.EnrichWithPullRequests && 
-                githubEnricher != null && 
-                repositoryId != null)
-            {
-                progress?.Invoke("Enrich", 3, 4, "Enriching with PR data...");
-                
-                var enrichResult = await githubEnricher.EnrichAsync(
-                    timeline,
-                    repositoryId,
-                    cancellationToken
-                );
-
-                if (enrichResult.IsSuccess)
-                {
-                    logger.LogInformation("Enriched {Count} events", 
-                        enrichResult.Value.MatchedCount);
-                }
-                else
-                {
-                    logger.LogWarning("PR enrichment failed: {Error}", enrichResult.Error);
-                }
-            }
-
-            // Step 5: Normalize
-            timeline.Normalize();
-
-            progress?.Invoke("Complete", 4, 4, "Export complete");
+            // Step 4 and 5 Enrich with PR data & Normalize
+            await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
+            timeline.Normalize(); 
             
+            progress?.Invoke("Complete", 4, 4, "Export complete");
             var stats = timeline.GetStatistics();
             logger.LogInformation("Export complete: {Stats}", stats);
 
             return Result<Timeline>.Success(timeline);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogWarning("Export cancelled");
-            return Result<Timeline>.Failure("Operation cancelled");
         }
         catch (Exception ex)
         {
@@ -184,7 +132,7 @@ internal sealed class RepositoryExporter(
     /// A <see cref="Result{String}"/> containing the local repository path.
     /// For URLs, returns path to temporary clone; for local paths, returns the path if it exists.
     /// </returns>
-    private async Task<Result<string>> GetRepositoryPathAsync(
+    private async Task<Result<string>> GetRepositoryPathStep(
         string pathOrUrl,
         CancellationToken cancellationToken)
     {
@@ -207,16 +155,106 @@ internal sealed class RepositoryExporter(
     }
 
     /// <summary>
+    /// Reads commits from  repository path using <see cref="IGitRepositoryReader"/>.
+    /// </summary>
+    /// <param name="repoPath">Local repository path.</param>
+    /// <param name="options">Export options controlling commit selection.</param>
+    /// <param name="progress">Optional progress callback to report read progress.</param>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task<Result<IReadOnlyList<CommitData>>> ReadCommitsStep(
+        string repoPath,
+        ExportOptions options,
+        ProgressCallback? progress,
+        CancellationToken ct)
+    {
+        progress?.Invoke("Read", 1, 4, "Reading commits...");
+
+        var commitsResult = await gitReader.ReadCommitsAsync(
+            repoPath,
+            new GitReaderOptions(
+                IncludeFileChanges: options.IncludeFileChanges,
+                MaxCommits: options.MaxCommits,
+                StartDate: options.StartDate,
+                EndDate: options.EndDate
+            ),
+            ct
+        );
+
+        if (commitsResult.IsFailure) return commitsResult;
+
+        var commits = commitsResult.Value;
+        progress?.Invoke("Read", 2, 4, $"Read {commits.Count} commits");
+
+        return Result<IReadOnlyList<CommitData>>.Success(commits);
+    }
+    
+    /// <summary>
+    /// Builds timeline from list of commits using <see cref="ITimelineBuilder"/>.
+    /// </summary>
+    /// <param name="commits">List of commits to build timeline from.</param>
+    /// <param name="options">Export options influencing timeline construction.</param>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <returns>
+    /// A <see cref="Result{Timeline}"/> containing the built timeline or error.
+    /// </returns>
+    private Result<Timeline> BuildTimelineStep(
+        IReadOnlyList<CommitData> commits, 
+        ExportOptions options,
+        ProgressCallback? progress)
+    {
+        progress?.Invoke("Build", 2, 4, "Building timeline...");
+        var repositoryId = ExtractRepositoryId(options.TimelineName ?? string.Empty);
+
+        var builderOptions = new TimelineBuilderOptions(
+            IncludeFileChanges: options.IncludeFileChanges,
+            IncludeBranchEvents: options.IncludeBranchEvents,
+            IncludeMergeDetection: options.IncludeMergeDetection,
+            Name: options.TimelineName,
+            RepositoryId: repositoryId
+        );
+
+        return timelineBuilder.Build(commits, builderOptions);
+    }
+    
+    /// <summary>
+    /// Enriches timeline with pull request data using <see cref="ITimelineEnricher"/>.
+    /// </summary>
+    /// <param name="timeline">Timeline to enrich.</param>
+    /// <param name="pathOrUrl">Repository path or URL (used to derive repository ID).</param>
+    /// <param name="options">Export options controlling enrichment.</param>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Task completing when enrichment finishes.</returns>
+    private async Task EnrichStep(
+        Timeline timeline,
+        string pathOrUrl,
+        ExportOptions options,
+        ProgressCallback? progress,
+        CancellationToken ct)
+    {
+        if (!options.EnrichWithPullRequests || githubEnricher == null)
+            return;
+
+        var repositoryId = ExtractRepositoryId(pathOrUrl);
+        if (repositoryId == null) return;
+
+        progress?.Invoke("Enrich", 3, 4, "Enriching with PR data...");
+        var enrichResult = await githubEnricher.EnrichAsync(timeline, repositoryId, ct);
+
+        if (enrichResult.IsSuccess)
+            logger.LogInformation("Enriched {Count} events", enrichResult.Value.MatchedCount);
+        else
+            logger.LogWarning("PR enrichment failed: {Error}", enrichResult.Error);
+    }
+    
+    /// <summary>
     /// Determines if a string is a Git URL.
     /// </summary>
     /// <param name="pathOrUrl">String to check.</param>
     /// <returns>True if string starts with http://, https://, or git@; otherwise false.</returns>
-    private static bool IsGitUrl(string pathOrUrl)
-    {
-        return pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-               pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+    private static bool IsGitUrl(string pathOrUrl) =>
+         pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
                pathOrUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase);
-    }
     
     /// <summary>
     /// Extracts repository owner and name from Git URL.
