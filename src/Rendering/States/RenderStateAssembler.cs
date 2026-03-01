@@ -1,8 +1,10 @@
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Player;
 using ChangeTrace.Rendering.Colors;
 using ChangeTrace.Rendering.Hud;
 using ChangeTrace.Rendering.Interfaces;
 using ChangeTrace.Rendering.Snapshots;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.States;
 
@@ -19,6 +21,7 @@ namespace ChangeTrace.Rendering.States;
 /// It also tracks per actor activity counts used to construct HUD leaderboard.
 /// </para>
 /// </remarks>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class RenderStateAssembler : IRenderStateAssembler
 {
     private readonly Dictionary<string, int> _actorEventCounts = new();

@@ -56,14 +56,13 @@ internal sealed class DefaultRenderSystemFactory(IServiceProvider services) : IR
     {
         var scene = services.GetRequiredService<ISceneGraph>();
         var anim = services.GetRequiredService<IAnimationSystem>();
+        var assembler = services.GetRequiredService<IRenderStateAssembler>();
         var camera = services.GetRequiredService<Camera.Camera>();
 
         var cameraCtrl = new CameraController(camera)
         {
             Mode = CameraFollowMode.FollowAverage
         };
-
-        var assembler = new RenderStateAssembler();
         
         var handlers = new IRenderCommandHandler[]
         {

@@ -42,5 +42,5 @@ internal interface ICameraController
     /// <param name="scene">The scene graph containing nodes, avatars, and edges.</param>
     /// <param name="dt">Time delta in seconds since last update.</param>
     /// <param name="viewportSize">The size of viewport for positioning and auto fit calculations.</param>
-    void Tick(SceneGraph scene, float dt, Vec2 viewportSize);
+    void Tick(ISceneGraph scene, float dt, Vec2 viewportSize);
 }

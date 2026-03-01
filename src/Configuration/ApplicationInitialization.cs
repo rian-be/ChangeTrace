@@ -1,5 +1,6 @@
 using ChangeTrace.Cli.Logging;
 using ChangeTrace.Configuration.Discovery;
+using ChangeTrace.Rendering.Camera;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -40,7 +41,8 @@ internal static class ApplicationInitialization
             builder.SetMinimumLevel(LogLevel.Debug);
             builder.AddProvider(new SpectreConsoleLoggerProvider(logLevel));
         }).CreateLogger("ServiceDiscovery");
-        
-        services.AddDiscoveredServices(true, logger: discoveryLogger);
+       
+        services.AddSingleton<Camera>();
+        services.AddDiscoveredServices(false, logger: discoveryLogger);
     }
 }

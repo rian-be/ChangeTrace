@@ -1,6 +1,5 @@
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Interfaces;
-using ChangeTrace.Rendering.Scene;
 
 namespace ChangeTrace.Rendering.Camera;
 
@@ -53,9 +52,9 @@ internal sealed class CameraController : ICameraController
     /// <param name="scene">Current scene graph snapshot.</param>
     /// <param name="dt">Delta time since last update (seconds).</param>
     /// <param name="viewportSize">Size of the viewport in pixels.</param>
-    public void Tick(SceneGraph scene, float dt, Vec2 viewportSize)
+    public void Tick(ISceneGraph scene, float dt, Vec2 viewportSize)
     {
-        Vec2? target = Mode switch
+        var target = Mode switch
         {
             CameraFollowMode.FollowAverage => ComputeCenterOfMass(scene),
             CameraFollowMode.FollowActive => ComputeActiveActor(scene),
@@ -138,7 +137,7 @@ internal sealed class CameraController : ICameraController
     /// <param name="viewportSize">Viewport size in pixels.</param>
     /// <param name="dt">Delta time since last update.</param>
     /// <returns>Target position for camera or <c>null</c> if no nodes.</returns>
-    private Vec2? FitAll(SceneGraph scene, Vec2 viewportSize, float dt)
+    private Vec2? FitAll(ISceneGraph scene, Vec2 viewportSize, float dt)
     {
         if (scene.Nodes.Count == 0)
             return null;
@@ -175,7 +174,7 @@ internal sealed class CameraController : ICameraController
     /// </summary>
     /// <param name="scene">Scene graph snapshot.</param>
     /// <returns>Center position or <c>null</c> if no avatars.</returns>
-    private static Vec2? ComputeCenterOfMass(SceneGraph scene)
+    private static Vec2? ComputeCenterOfMass(ISceneGraph scene)
     {
         if (scene.Avatars.Count == 0)
             return null;
@@ -192,7 +191,7 @@ internal sealed class CameraController : ICameraController
     /// </summary>        
     /// <param name="scene">Scene graph snapshot.</param>
     /// <returns>Target position for camera.</returns>
-    private Vec2? ComputeActiveActor(SceneGraph scene)
+    private Vec2? ComputeActiveActor(ISceneGraph scene)
     {
         if (TargetActorId is null)
             return ComputeCenterOfMass(scene);

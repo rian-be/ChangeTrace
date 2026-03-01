@@ -1,5 +1,7 @@
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Rendering.Interfaces;
 using ChangeTrace.Rendering.States;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.Outputs;
 
@@ -10,6 +12,7 @@ namespace ChangeTrace.Rendering.Outputs;
 /// Useful for development or testing without a graphical UI.
 /// Logs all nodes, active avatars, and basic scene statistics.
 /// </remarks>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class DebugRenderOutput : IRenderOutput
 {
     /// <summary>
