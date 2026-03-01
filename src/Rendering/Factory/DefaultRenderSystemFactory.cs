@@ -54,9 +54,8 @@ internal sealed class DefaultRenderSystemFactory(IServiceProvider services) : IR
             ITranslationPipeline translation,
             IRenderOutput renderer) Create()
     {
-        // Resolve core services
-        var scene = services.GetRequiredService<SceneGraph>();
-        var anim = services.GetRequiredService<AnimationSystem>();
+        var scene = services.GetRequiredService<ISceneGraph>();
+        var anim = services.GetRequiredService<IAnimationSystem>();
         var camera = services.GetRequiredService<Camera.Camera>();
 
         var cameraCtrl = new CameraController(camera)

@@ -1,5 +1,4 @@
 using ChangeTrace.Cli.Extensions;
-using ChangeTrace.Cli.Handlers;
 using ChangeTrace.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,9 +13,6 @@ public static class Program
      //   services.ConfigureApp(logLevel: LogLevel.Information);
         services.ConfigureApp(logLevel: LogLevel.Debug);
         services.AddHttpClient();
-        
-        services.AddTransient<ExportCommandHandler>();
-        services.AddTransient<ShowTimelineCommandHandler>();
 
         var provider = services.BuildServiceProvider();
       

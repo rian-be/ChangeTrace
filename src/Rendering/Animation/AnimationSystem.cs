@@ -1,4 +1,6 @@
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Rendering.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.Animation;
 
@@ -13,6 +15,7 @@ namespace ChangeTrace.Rendering.Animation;
 /// <item>Exposes <see cref="Particles"/> for read-only access to all active particles.</item>
 /// </list>
 /// </remarks>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class AnimationSystem : IAnimationSystem
 {
     private readonly List<Tween<Vec2>> _vecTweens   = [];

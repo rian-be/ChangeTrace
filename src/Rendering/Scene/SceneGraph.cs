@@ -1,6 +1,8 @@
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.Scene;
 
@@ -11,6 +13,7 @@ namespace ChangeTrace.Rendering.Scene;
 /// Holds current state of scene, including nodes (<see cref="SceneNode"/>),
 /// avatars (<see cref="ActorAvatar"/>), and edges (<see cref="SceneEdge"/>).
 /// </remarks>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class SceneGraph : ISceneGraph
 {
     private readonly Dictionary<string, SceneNode> _nodes = new();
