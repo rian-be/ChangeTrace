@@ -2,7 +2,7 @@ using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Specifications.Filters;
 
-namespace ChangeTrace.Core.Specifications.Queries;
+namespace ChangeTrace.Core.Specifications.Queries.Commits;
 
 /// <summary>
 /// Commit queries providing reusable specifications for <see cref="TraceEvent"/> instances.
@@ -43,4 +43,5 @@ internal static class CommitQueries
     /// </returns>
     public static Specification<TraceEvent> EnrichedMerges()
         => new MergeCommitsOnlySpec().And(new PullRequestsOnlySpec());
+    
 }
