@@ -1,3 +1,4 @@
+using System.Numerics;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Rendering.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,7 +59,7 @@ internal sealed class AnimationSystem : IAnimationSystem
     /// <param name="color">Particle color (packed RGB).</param>
     /// <param name="speed">Maximum particle speed.</param>
     /// <param name="lifetime">Particle lifetime in seconds.</param>
-    public void Burst(Vec2 origin, int count, uint color, float speed = 60f, float lifetime = 1.2f)
+    public void Burst(Vec2 origin, int count, Vector4 color, float speed = 60f, float lifetime = 1.2f)
     {
         var rng = Random.Shared;
         for (int i = 0; i < count; i++)
@@ -67,7 +68,7 @@ internal sealed class AnimationSystem : IAnimationSystem
             _particles.Add(particle);
         }
 
-        static Particle CreateParticle(Vec2 origin, uint color, float speed, float lifetime, Random rng)
+        static Particle CreateParticle(Vec2 origin, Vector4 color, float speed, float lifetime, Random rng)
         {
             float angle = rng.NextSingle() * MathF.PI * 2f;
             float spd   = speed * (0.4f + rng.NextSingle() * 0.6f);

@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace ChangeTrace.Rendering.Snapshots;
 
 /// <summary>
@@ -10,7 +12,7 @@ namespace ChangeTrace.Rendering.Snapshots;
 internal sealed record AvatarSnapshot(
     string Actor,
     Vec2 Position,
-    uint Color,
+    Vector4 Color,
     float Alpha,
     float ActivityLevel
 );

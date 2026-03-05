@@ -1,3 +1,4 @@
+using System.Numerics;
 using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Rendering.Scene;
@@ -33,7 +34,7 @@ internal sealed class ActorAvatar
     /// <summary>
     /// Visual color of avatar, deterministic from palette.
     /// </summary>
-    internal uint Color { get; }
+    internal Vector4 Color { get; }
 
     /// <summary>
     /// Transparency of avatar (1 = opaque, 0 = invisible).
@@ -56,7 +57,7 @@ internal sealed class ActorAvatar
     /// <param name="actor">Actor identifier.</param>
     /// <param name="spawnPosition">Initial position in scene.</param>
     /// <param name="color">Deterministic color from palette.</param>
-    internal ActorAvatar(ActorName actor, Vec2 spawnPosition, uint color)
+    internal ActorAvatar(ActorName actor, Vec2 spawnPosition, Vector4 color)
     {
         Actor = actor;
         Position = Target = spawnPosition;

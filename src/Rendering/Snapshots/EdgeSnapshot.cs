@@ -1,3 +1,4 @@
+using System.Numerics;
 using ChangeTrace.Rendering.Enums;
 
 namespace ChangeTrace.Rendering.Snapshots;
@@ -14,5 +15,5 @@ internal sealed record EdgeSnapshot(
     string ToId,
     EdgeKind Kind,
     float Alpha,
-    uint Color
+    Vector4 Color
 );
