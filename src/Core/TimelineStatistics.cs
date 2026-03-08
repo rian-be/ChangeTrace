@@ -1,4 +1,5 @@
 using ChangeTrace.Core.Models;
+using ChangeTrace.Core.Timelines;
 
 namespace ChangeTrace.Core;
 

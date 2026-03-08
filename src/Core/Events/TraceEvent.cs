@@ -1,165 +1,60 @@
 using ChangeTrace.Core.Enums;
+using ChangeTrace.Core.Events.Info;
 using ChangeTrace.Core.Models;
-using ChangeTrace.Core.Results;
 
 namespace ChangeTrace.Core.Events;
 
 /// <summary>
-/// Rich domain model for a single Git event.
-/// Contains behavior, not just data.
+/// Represents single trace event in repository timeline.
 /// </summary>
-internal sealed class TraceEvent
+/// <remarks>
+/// <list type="bullet">
+/// <item>Holds core event data via <see cref="Core"/>.</item>
+/// <item>Optionally references a <see cref="Commit"/>, <see cref="Branch"/>, <see cref="PullRequest"/>, or <see cref="Metadata"/>.</item>
+/// <item>Supports computing relative times for playback via <see cref="RelativeTime"/>.</item>
+/// <item>Provides convenience methods to create modified copies with updated pull request or metadata.</item>
+/// </list>
+/// </remarks>
+internal readonly record struct TraceEvent(
+    TraceEventCore Core,
+    CommitInfo? Commit = null,
+    BranchInfo? Branch = null,
+    PullRequestInfo? PullRequest = null,
+    MetadataInfo? Metadata = null,
+    Duration? RelativeTime = null)
 {
-    // Core properties
-    internal Timestamp Timestamp { get; set; }
-    internal ActorName Actor { get; }
-    public string Target { get; }
-    public string? Metadata { get; private set; }
-    
-    // Type safe optional properties
-    public CommitSha? CommitSha { get; }
-    public BranchName? BranchName { get; }
-    public PullRequestNumber? PullRequestNumber { get; private set; }
-    
-    public List<ActorName>? Reviewers { get; private set; }
-    public ActorName? MergedBy { get; private set; }  
-    
-    public List<ActorName>? Contributors { get; private set; }
-    public Dictionary<ActorName, Timestamp>? LastModified { get; private set; }
-    
-    public FilePath? FilePath { get; }
-    
-    // Event types
-    public CommitEventType? CommitType { get; }
-    public BranchEventType? BranchType { get; }
-    public PullRequestEventType? PrType { get; private set; }
-
-    private Duration? RelativeTime { get; set; }
-         
     /// <summary>
-    /// Returns the time for playback.
+    /// Returns a copy of this <see cref="TraceEvent"/> with updated pull request info.
     /// </summary>
-    internal double TimeForPlayback => RelativeTime?.TotalSeconds ?? Timestamp.UnixSeconds;
-    
-    internal TraceEvent(
-        Timestamp timestamp,
-        ActorName actor,
-        string target,
-        string? metadata,
-        CommitSha? commitSha,
-        BranchName? branchName,
-        PullRequestNumber? prNumber,
-        FilePath? filePath,
-        CommitEventType? commitType,
-        BranchEventType? branchType,
-        PullRequestEventType? prType)
-    {
-        Timestamp = timestamp;
-        Actor = actor;
-        Target = target;
-        Metadata = metadata;
-        CommitSha = commitSha;
-        BranchName = branchName;
-        PullRequestNumber = prNumber;
-        FilePath = filePath;
-        CommitType = commitType;
-        BranchType = branchType;
-        PrType = prType;
-    }
-    
-    /// <summary>
-    /// Enrich event with PR data (mutation for performance)
-    /// </summary>
-    internal Result EnrichWithPullRequest(
-        PullRequestNumber prNumber,
-        PullRequestEventType prType,
-        string? additionalMetadata = null)
-    {
-        if (PullRequestNumber.HasValue)
-            return Result.Failure("Event already has PR data");
-
-        PullRequestNumber = prNumber;
-        PrType = prType;
-        
-        if (additionalMetadata != null)
-            Metadata = CombineMetadata(Metadata, additionalMetadata);
-
-        return Result.Success();
-    }
-    
-    internal void NormalizeTime(Timestamp baseTime, double scale = 1.0) =>
-        Timestamp = Timestamp.Normalize(baseTime, scale: scale);
-    
-    /// <summary>
-    /// Computes relative time from a base timestamp.
-    /// </summary>
-    /// <param name="baseTime">Base timestamp.</param>
-    /// <param name="scale">Optional scale factor.</param>
-    internal void ComputeRelativeTime(Timestamp baseTime, double scale = 1.0) =>
-        RelativeTime = Timestamp.Subtract(baseTime).Scale(scale);
-    
-    /// <summary>
-    /// Adds contributor to the event and updates last modified timestamp.
-    /// </summary>
-    /// <param name="actor">Contributor actor.</param>
-    /// <param name="time">Timestamp of contribution.</param>
-    internal void AddContributor(ActorName actor, Timestamp time)
-    {
-        Contributors ??= [];
-        if (!Contributors.Contains(actor)) Contributors.Add(actor);
-
-        LastModified ??= new Dictionary<ActorName, Timestamp>();
-        LastModified[actor] = time;
-    }
-    
-    /// <summary>
-    /// Check if this is a merge commit
-    /// </summary>
-    internal bool IsMergeCommit() => BranchType == BranchEventType.Merge;
+    /// <param name="number">The pull request number.</param>
+    /// <param name="type">The type of pull request event.</param>
+    /// <returns>A new <see cref="TraceEvent"/> with <see cref="PullRequest"/> set.</returns>
+    public TraceEvent WithPullRequest(PullRequestNumber number, PullRequestEventType type)
+        => this with { PullRequest = new PullRequestInfo(number, type) };
 
     /// <summary>
-    /// Check if event has PR data
+    /// Computes the relative time from a base timestamp and optional scale factor.
     /// </summary>
-    internal bool HasPullRequest() => PrType.HasValue;
+    /// <param name="baseTime">The reference base timestamp.</param>
+    /// <param name="scale">Scale factor to apply to the relative duration (default is 1.0).</param>
+    /// <returns>A new <see cref="TraceEvent"/> with <see cref="RelativeTime"/> computed.</returns>
+    public TraceEvent ComputeRelative(Timestamp baseTime, double scale = 1.0)
+        => this with { RelativeTime = Core.Timestamp.Subtract(baseTime).Scale(scale) };
 
     /// <summary>
-    /// Get human-readable event type
+    /// Returns a copy of this <see cref="TraceEvent"/> with updated metadata.
     /// </summary>
-    private string GetEventType() => (PrType, BranchType, CommitType) switch
-    {
-        (not null, _, _) => $"PR:{PrType}",
-        (_, not null, _) => $"Branch:{BranchType}",
-        (_, _, not null) => $"Commit:{CommitType}",
-        _ => "Unknown"
-    };
+    /// <param name="newMetadata">The metadata to set.</param>
+    /// <returns>A new <see cref="TraceEvent"/> with <see cref="Metadata"/> set.</returns>
+    public TraceEvent WithMetadata(MetadataInfo newMetadata) => this with { Metadata = newMetadata };
 
     /// <summary>
-    /// Check if target matches (supports partial SHA matching)
+    /// Gets the playback time in seconds, using <see cref="RelativeTime"/> if available, otherwise the core timestamp.
     /// </summary>
-    internal bool MatchesTarget(string target)
-    {
-        if (Target.Equals(target, StringComparison.Ordinal))
-            return true;
+    public double TimeForPlayback => RelativeTime?.TotalSeconds ?? Core.Timestamp.UnixSeconds;
 
-        // Partial SHA matching
-        if (CommitSha != null && target.Length >= 7)
-        {
-            var targetShaResult = CommitSha.Create(target);
-            if (targetShaResult.IsSuccess)
-                return CommitSha.Matches(targetShaResult.Value);
-        }
-
-        return false;
-    }
-
-    private static string CombineMetadata(string? existing, string newMetadata)
-    {
-        if (string.IsNullOrEmpty(existing))
-            return newMetadata;
-        
-        return $"{existing} | {newMetadata}";
-    }
-
-    public override string ToString() => 
-        $"[{Timestamp}] {Actor}: {GetEventType()} on {Target}";
+    /// <summary>
+    /// Gets the primary target of the event: branch name, commit target, or core target.
+    /// </summary>
+    public string Target => Branch?.Name.Value ?? Commit?.Target ?? Core.Target;
 }

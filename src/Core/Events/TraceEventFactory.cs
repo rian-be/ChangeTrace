@@ -1,53 +1,55 @@
 using ChangeTrace.Core.Enums;
+using ChangeTrace.Core.Events.Info;
 using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Events;
 
 /// <summary>
-/// Factory for creating strongly-typed timeline events.
-/// Provides clean, fluent API for constructing different types of trace events
-/// while hiding the complexity of the underlying constructor.
+/// Factory responsible for constructing strongly-typed <see cref="TraceEvent"/> instances.
 /// </summary>
+/// <remarks>
+/// <list type="bullet">
+/// <item>Encapsulates the construction logic of <see cref="TraceEvent"/>.</item>
+/// <item>Ensures consistent creation of event structures across the system.</item>
+/// <item>Provides domain-specific factory methods for commits, files, branches, pull requests, and merges.</item>
+/// </list>
+/// </remarks>
 internal static class TraceEventFactory
 {
     /// <summary>
-    /// Creates commit event.
+    /// Creates a commit event representing a commit in the repository.
     /// </summary>
-    /// <param name="timestamp">When the commit occurred.</param>
-    /// <param name="actor">Who made the commit.</param>
-    /// <param name="sha">The commit's unique SHA identifier.</param>
-    /// <param name="message">Optional commit message.</param>
-    /// <returns>A trace event representing a standard commit.</returns>
+    /// <param name="timestamp">Timestamp of the commit.</param>
+    /// <param name="actor">Actor responsible for the commit.</param>
+    /// <param name="sha">Commit SHA identifier.</param>
+    /// <param name="message">Optional commit message metadata.</param>
+    /// <returns>A <see cref="TraceEvent"/> describing the commit.</returns>
     internal static TraceEvent Commit(
         Timestamp timestamp,
         ActorName actor,
         CommitSha sha,
         string? message = null)
-        => new(
-            timestamp,
-            actor,
-            sha.Value,
-            message,
-            sha,
-            null,
-            null,
-            null,
-            CommitEventType.Commit,
-            null,
-            null
+    {
+        var commitInfo = new CommitInfo(sha, CommitEventType.Commit);
+        var metadata = string.IsNullOrEmpty(message) ? (MetadataInfo?)null : new MetadataInfo(message);
+
+        return new TraceEvent(
+            new TraceEventCore(timestamp, actor, sha.Value),
+            Commit: commitInfo,
+            Metadata: metadata
         );
+    }
 
     /// <summary>
-    /// Creates file change event.
-    /// Represents a specific file modification within a commit.
+    /// Creates a file change event representing a modification of a specific file in a commit.
     /// </summary>
-    /// <param name="timestamp">When the file change occurred.</param>
-    /// <param name="actor">Who made the change.</param>
-    /// <param name="path">Path to the changed file.</param>
-    /// <param name="type">Type of change (Added, Modified, Deleted, Renamed).</param>
-    /// <param name="sha">The commit SHA containing this change.</param>
-    /// <param name="metadata">Optional additional information about the change.</param>
-    /// <returns>A trace event representing a file-level change.</returns>
+    /// <param name="timestamp">Timestamp of the change.</param>
+    /// <param name="actor">Actor responsible for the change.</param>
+    /// <param name="path">Path of the affected file.</param>
+    /// <param name="type">Type of commit-related change.</param>
+    /// <param name="sha">Commit SHA associated with the change.</param>
+    /// <param name="metadata">Optional additional metadata.</param>
+    /// <returns>A <see cref="TraceEvent"/> describing the file change.</returns>
     internal static TraceEvent FileChange(
         Timestamp timestamp,
         ActorName actor,
@@ -55,31 +57,27 @@ internal static class TraceEventFactory
         CommitEventType type,
         CommitSha sha,
         string? metadata = null)
-        => new(
-            timestamp,
-            actor,
-            path.Value,
-            metadata,
-            sha,
-            null,
-            null,
-            path,
-            type,
-            null,
-            null
+    {
+        var commitInfo = new CommitInfo(sha, type);
+        var metadatas = new MetadataInfo(metadata, path);
+
+        return new TraceEvent(
+            new TraceEventCore(timestamp, actor, path.Value),
+            Commit: commitInfo,
+            Metadata: metadatas
         );
+    }
 
     /// <summary>
-    /// Creates branch event.
-    /// Represents branch operations like creation, deletion, or checkout.
+    /// Creates a branch event such as branch creation, deletion, or merge.
     /// </summary>
-    /// <param name="timestamp">When the branch operation occurred.</param>
-    /// <param name="actor">Who performed the branch operation.</param>
-    /// <param name="branch">The branch name.</param>
-    /// <param name="type">Type of branch operation (Create, Delete, Checkout).</param>
-    /// <param name="sha">Optional commit SHA associated with the branch operation.</param>
-    /// <param name="metadata">Optional additional information about the branch operation.</param>
-    /// <returns>A trace event representing a branch operation.</returns>
+    /// <param name="timestamp">Timestamp of the branch event.</param>
+    /// <param name="actor">Actor responsible for the action.</param>
+    /// <param name="branch">Branch involved in the event.</param>
+    /// <param name="type">Type of branch event.</param>
+    /// <param name="sha">Optional commit associated with the branch event.</param>
+    /// <param name="metadata">Optional metadata.</param>
+    /// <returns>A <see cref="TraceEvent"/> describing the branch event.</returns>
     internal static TraceEvent Branch(
         Timestamp timestamp,
         ActorName actor,
@@ -87,47 +85,72 @@ internal static class TraceEventFactory
         BranchEventType type,
         CommitSha? sha = null,
         string? metadata = null)
-        => new(
-            timestamp,
-            actor,
-            branch.Value,
-            metadata,
-            sha,
-            branch,
-            null,
-            null,
-            null,
-            type,
-            null
+    {
+        var branchInfo = new BranchInfo(branch, type);
+        var metadatas = metadata != null ? new MetadataInfo(metadata) : (MetadataInfo?)null;
+
+        return new TraceEvent(
+            new TraceEventCore(timestamp, actor, branch.Value),
+            Commit: sha != null ? new CommitInfo(sha, CommitEventType.Commit) : null,
+            Branch: branchInfo,
+            Metadata: metadatas
         );
+    }
 
     /// <summary>
-    /// Creates merge commit event.
-    /// Specialized commit event representing a merge operation.
+    /// Creates pull request event.
     /// </summary>
-    /// <param name="timestamp">When the merge occurred.</param>
-    /// <param name="actor">Who performed the merge.</param>
-    /// <param name="sha">The merge commit SHA.</param>
-    /// <param name="target">Optional target branch that received the merge.</param>
+    /// <param name="timestamp">Timestamp of the pull request event.</param>
+    /// <param name="actor">Actor responsible for the action.</param>
+    /// <param name="number">Pull request number.</param>
+    /// <param name="type">Type of pull request event.</param>
+    /// <param name="branch">Optional branch associated with the pull request.</param>
+    /// <param name="metadataStr">Optional metadata string.</param>
+    /// <returns>A <see cref="TraceEvent"/> describing the pull request event.</returns>
+    internal static TraceEvent PullRequest(
+        Timestamp timestamp,
+        ActorName actor,
+        PullRequestNumber number,
+        PullRequestEventType type,
+        BranchName? branch = null,
+        string? metadataStr = null)
+    {
+        var prInfo = new PullRequestInfo(number, type);
+        var metadata = metadataStr != null ? new MetadataInfo(metadataStr) : (MetadataInfo?)null;
+
+        return new TraceEvent(
+            new TraceEventCore(timestamp, actor, branch?.Value ?? string.Empty),
+            Branch: branch != null ? new BranchInfo(branch, BranchEventType.Merge) : null,
+            PullRequest: prInfo,
+            Metadata: metadata
+        );
+    }
+
+    /// <summary>
+    /// Creates a merge commit event representing a commit that merges into a target branch.
+    /// </summary>
+    /// <param name="timestamp">Timestamp of the merge commit.</param>
+    /// <param name="actor">Actor responsible for the merge.</param>
+    /// <param name="sha">Commit SHA of the merge commit.</param>
+    /// <param name="target">Target branch receiving the merge.</param>
     /// <param name="message">Optional merge commit message.</param>
-    /// <returns>A trace event representing a merge commit.</returns>
+    /// <returns>A <see cref="TraceEvent"/> describing the merge event.</returns>
     internal static TraceEvent Merge(
         Timestamp timestamp,
         ActorName actor,
         CommitSha sha,
-        BranchName? target = null,
+        BranchName target,
         string? message = null)
-        => new(
-            timestamp,
-            actor,
-            sha.Value,
-            message,
-            sha,
-            target,
-            null,
-            null,
-            CommitEventType.Commit,
-            BranchEventType.Merge,
-            null
+    {
+        var commitInfo = new CommitInfo(sha, CommitEventType.Commit);
+        var branchInfo = new BranchInfo(target, BranchEventType.Merge);
+        var metadata = message != null ? new MetadataInfo(message) : (MetadataInfo?)null;
+
+        return new TraceEvent(
+            new TraceEventCore(timestamp, actor, target.Value),
+            Commit: commitInfo,
+            Branch: branchInfo,
+            Metadata: metadata
         );
+    }
 }

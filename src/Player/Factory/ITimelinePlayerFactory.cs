@@ -1,4 +1,5 @@
 using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.Player.Enums;
 using ChangeTrace.Player.Interfaces;
 

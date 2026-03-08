@@ -1,4 +1,5 @@
 using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 
 namespace ChangeTrace.GIt.Enrichers;
 

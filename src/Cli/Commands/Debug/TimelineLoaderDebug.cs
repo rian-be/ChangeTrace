@@ -1,4 +1,5 @@
 using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 
 namespace ChangeTrace.Cli.Commands.Debug;
