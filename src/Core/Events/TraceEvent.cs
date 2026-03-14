@@ -38,7 +38,7 @@ internal readonly record struct TraceEvent(
     /// <param name="baseTime">The reference base timestamp.</param>
     /// <param name="scale">Scale factor to apply to the relative duration (default is 1.0).</param>
     /// <returns>A new <see cref="TraceEvent"/> with <see cref="RelativeTime"/> computed.</returns>
-    public TraceEvent ComputeRelative(Timestamp baseTime, double scale = 1.0)
+    public TraceEvent ComputeRelative(in Timestamp baseTime, double scale = 1.0)
         => this with { RelativeTime = Core.Timestamp.Subtract(baseTime).Scale(scale) };
 
     /// <summary>
@@ -46,7 +46,7 @@ internal readonly record struct TraceEvent(
     /// </summary>
     /// <param name="newMetadata">The metadata to set.</param>
     /// <returns>A new <see cref="TraceEvent"/> with <see cref="Metadata"/> set.</returns>
-    public TraceEvent WithMetadata(MetadataInfo newMetadata) => this with { Metadata = newMetadata };
+    public TraceEvent WithMetadata(in MetadataInfo newMetadata) => this with { Metadata = newMetadata };
 
     /// <summary>
     /// Gets the playback time in seconds, using <see cref="RelativeTime"/> if available, otherwise the core timestamp.
@@ -56,5 +56,5 @@ internal readonly record struct TraceEvent(
     /// <summary>
     /// Gets the primary target of the event: branch name, commit target, or core target.
     /// </summary>
-    public string Target => Branch?.Name.Value ?? Commit?.Target ?? Core.Target;
+    public string Target => Branch?.Name.Value ?? Core.Target;
 }

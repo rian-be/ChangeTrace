@@ -12,7 +12,7 @@ namespace ChangeTrace.Core.Events.Info;
 /// <item>Provides helper method <see cref="WithTimestamp"/> to create a copy with an updated timestamp.</item>
 /// </list>
 /// </remarks>
-internal readonly record struct TraceEventCore(Timestamp Timestamp, ActorName Actor, string Target)
+internal readonly record struct TraceEventCore(Timestamp Timestamp, ActorName Actor,  string Target)
 {
     /// <summary>
     /// Returns a copy of this <see cref="TraceEventCore"/> with a new timestamp.

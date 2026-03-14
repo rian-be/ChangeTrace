@@ -30,16 +30,16 @@ internal static class TraceEventFactory
         CommitSha sha,
         string? message = null)
     {
-        var commitInfo = new CommitInfo(sha, CommitEventType.Commit);
+        var commitInfo = new CommitInfo(sha, FileChangeKind.Commit);
         var metadata = string.IsNullOrEmpty(message) ? (MetadataInfo?)null : new MetadataInfo(message);
-
+        
         return new TraceEvent(
             new TraceEventCore(timestamp, actor, sha.Value),
             Commit: commitInfo,
             Metadata: metadata
         );
     }
-
+    
     /// <summary>
     /// Creates a file change event representing a modification of a specific file in a commit.
     /// </summary>
@@ -54,7 +54,7 @@ internal static class TraceEventFactory
         Timestamp timestamp,
         ActorName actor,
         FilePath path,
-        CommitEventType type,
+        FileChangeKind type,
         CommitSha sha,
         string? metadata = null)
     {
@@ -91,7 +91,7 @@ internal static class TraceEventFactory
 
         return new TraceEvent(
             new TraceEventCore(timestamp, actor, branch.Value),
-            Commit: sha != null ? new CommitInfo(sha, CommitEventType.Commit) : null,
+            Commit: sha != null ? new CommitInfo(sha, FileChangeKind.Commit) : null,
             Branch: branchInfo,
             Metadata: metadatas
         );
@@ -142,7 +142,7 @@ internal static class TraceEventFactory
         BranchName target,
         string? message = null)
     {
-        var commitInfo = new CommitInfo(sha, CommitEventType.Commit);
+        var commitInfo = new CommitInfo(sha, FileChangeKind.Commit);
         var branchInfo = new BranchInfo(target, BranchEventType.Merge);
         var metadata = message != null ? new MetadataInfo(message) : (MetadataInfo?)null;
 
