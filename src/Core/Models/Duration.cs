@@ -6,7 +6,7 @@ namespace ChangeTrace.Core.Models;
 /// <remarks>
 /// Immutable value type. Supports scaling and conversion to total seconds.
 /// </remarks>
-internal readonly struct Duration
+internal readonly record struct Duration
 {
     /// <summary>Internal storage of seconds.</summary>
     private long Seconds { get; }

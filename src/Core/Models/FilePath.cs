@@ -50,5 +50,5 @@ internal sealed record FilePath : ValueObject
         Value.StartsWith(directory.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase);
 
     public override string ToString() => Value;
-    public static implicit operator string(FilePath path) => path.Value;
+    public static implicit operator string?(FilePath? path) => path?.Value;
 }
