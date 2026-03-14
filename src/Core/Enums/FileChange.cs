@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core;
+namespace ChangeTrace.Core.Enums;
 
 /// <summary>
 /// Represents a file change within a commit.

@@ -1,4 +1,4 @@
-namespace ChangeTrace.Core;
+namespace ChangeTrace.Core.Enums;
 
 /// <summary>
 /// Specifies the type of change that occurred to a file in a commit.
@@ -6,6 +6,7 @@ namespace ChangeTrace.Core;
 /// </summary>
 public enum FileChangeKind
 {
+    Commit,
     Added,
     Modified,
     Deleted,
