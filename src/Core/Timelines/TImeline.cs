@@ -14,7 +14,7 @@ namespace ChangeTrace.Core.Timelines;
 /// <item>Acts as the primary container for timeline-based analysis and playback.</item>
 /// </list>
 /// </remarks>
-internal sealed class Timeline(string? name = null, RepositoryId? repositoryId = null)
+internal sealed class Timeline(RepositoryId repositoryId)
 {
     private readonly List<TraceEvent> _events = [];
 
@@ -36,11 +36,6 @@ internal sealed class Timeline(string? name = null, RepositoryId? repositoryId =
     /// Gets the number of events stored in the timeline.
     /// </summary>
     internal int Count => _events.Count;
-
-    /// <summary>
-    /// Gets the optional human-readable name of the timeline.
-    /// </summary>
-    internal string? Name { get; } = name;
 
     /// <summary>
     /// Gets the identifier of the repository associated with this timeline.
