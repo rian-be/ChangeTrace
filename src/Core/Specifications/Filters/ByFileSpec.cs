@@ -1,7 +1,7 @@
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 
-namespace ChangeTrace.Core.Specifications.Filters.Ownership;
+namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filter that matches only commit events for a specific file.
@@ -15,7 +15,10 @@ internal sealed class ByFileSpec(FilePath filePath) : Specification<TraceEvent>
     /// <returns><c>true</c> if the event is a commit for the specified file; otherwise, <c>false</c>.</returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
     {
-        return item is { CommitType: not null, FilePath: not null } &&
-               item.FilePath.Equals(filePath);
+        if (item.Commit == null || !item.Metadata.HasValue)
+            return false;
+        
+        var meta = item.Metadata.Value;
+        return meta.FilePath != null && meta.FilePath.Equals(filePath);
     }
 }

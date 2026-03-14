@@ -1,6 +1,7 @@
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Specifications.Filters;
+using ChangeTrace.Core.Specifications.Filters.Commit;
 
 namespace ChangeTrace.Core.Specifications.Queries.Commits;
 
@@ -35,13 +36,15 @@ internal static class CommitQueries
         => new MergeCommitsOnlySpec();
 
     /// <summary>
-    /// Creates  specification for merge commits that are associated with pull requests.
+    /// Creates specification for merge commits that are associated with pull requests.
     /// </summary>
     /// <returns>
     /// A specification matching merge commits that also correspond to pull request merges.
     /// Combines <see cref="MergeCommitsOnlySpec"/> with <see cref="PullRequestsOnlySpec"/>.
     /// </returns>
-    public static Specification<TraceEvent> EnrichedMerges()
-        => new MergeCommitsOnlySpec().And(new PullRequestsOnlySpec());
-    
+   // public static Specification<TraceEvent> EnrichedMerges() => new MergeCommitsOnlySpec().And(new PullRequestsOnlySpec());
+
+    public static Specification<TraceEvent> Bundleable()
+        => new HasFilePathSpec()
+            .And(new NonMergeCommitSpec());
 }

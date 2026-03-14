@@ -21,5 +21,5 @@ internal sealed class ByActorSpec(ActorName actor) : Specification<TraceEvent>
     /// otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item) 
-        => item.Actor == actor;
+        => item.Core.Actor == actor;
 }

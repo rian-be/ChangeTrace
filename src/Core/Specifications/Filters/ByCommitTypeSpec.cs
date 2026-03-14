@@ -1,6 +1,6 @@
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
-using ChangeTrace.Core.Models;
+using ChangeTrace.Core.Events.Info;
 
 namespace ChangeTrace.Core.Specifications.Filters;
 
@@ -11,7 +11,7 @@ namespace ChangeTrace.Core.Specifications.Filters;
 /// Non-commit events are implicitly excluded.
 /// </summary>
 /// <param name="commitType">Commit event type to match</param>
-internal sealed class ByCommitTypeSpec(CommitEventType commitType) : Specification<TraceEvent>
+internal sealed class ByCommitTypeSpec(FileChangeKind commitType) : Specification<TraceEvent>
 {
     /// <summary>
     /// Determines whether the event has the specified commit type.
@@ -22,5 +22,5 @@ internal sealed class ByCommitTypeSpec(CommitEventType commitType) : Specificati
     /// otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
-        => item.CommitType == commitType;
+        => item.Commit.HasValue && item.Commit.Value.Type == commitType;
 }

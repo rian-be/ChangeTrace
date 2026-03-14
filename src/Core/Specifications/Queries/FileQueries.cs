@@ -29,7 +29,7 @@ internal static class FileQueries
     /// <param name="actor">The actor who made the modifications.</param>
     /// <param name="directory">The directory in which the modifications occurred.</param>
     /// <returns>
-    /// A specification matching events that are file modifications (<see cref="CommitEventType.FileModified"/>)
+    /// A specification matching events that are file modifications (<see cref="FileChangeKind.Modified"/>)
     /// made by the given <paramref name="actor"/> in the specified <paramref name="directory"/>.
     /// Combines <see cref="ByCommitTypeSpec"/>, <see cref="ByActorSpec"/>, and <see cref="InDirectorySpec"/>.
     /// </returns>
@@ -37,7 +37,7 @@ internal static class FileQueries
         ActorName actor,
         string directory)
     {
-        return new ByCommitTypeSpec(CommitEventType.FileModified)
+        return new ByCommitTypeSpec(FileChangeKind.Modified)
             .And(new ByActorSpec(actor))
             .And(new InDirectorySpec(directory));
     }

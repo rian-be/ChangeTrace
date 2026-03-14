@@ -1,5 +1,4 @@
 using ChangeTrace.Core.Events;
-using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Specifications.Filters.Temporal;
 
@@ -19,10 +18,10 @@ internal sealed class CommitsBetweenHoursSpec(int startHour, int endHour) : Spec
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
     {
-        if (item.CommitType == null)
+        if (item.Commit?.Type == null)
             return false;
 
-        var hour = DateTimeOffset.FromUnixTimeSeconds(item.Timestamp.UnixSeconds).UtcDateTime.Hour;
+        var hour = DateTimeOffset.FromUnixTimeSeconds(item.Core.Timestamp.UnixSeconds).UtcDateTime.Hour;
         var diff = (hour - startHour + 24) % 24;
         var range = (endHour - startHour + 24) % 24;
 

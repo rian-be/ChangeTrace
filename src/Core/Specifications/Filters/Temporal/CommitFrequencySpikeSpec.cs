@@ -26,10 +26,10 @@ internal sealed class CommitFrequencySpikeSpec(int commitsPerHourThreshold) : Sp
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
     {
-        if (item.CommitType == null)
+        if (item.Commit?.Type == null)
             return false;
 
-        long hourKey = item.Timestamp.UnixSeconds / 3600;
+        long hourKey = item.Core.Timestamp.UnixSeconds / 3600;
 
         if (!_hourCounts.TryAdd(hourKey, 1))
             _hourCounts[hourKey]++;

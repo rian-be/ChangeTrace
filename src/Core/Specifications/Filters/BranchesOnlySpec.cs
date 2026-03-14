@@ -1,5 +1,4 @@
 using ChangeTrace.Core.Events;
-using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Specifications.Filters;
 
@@ -21,5 +20,5 @@ internal sealed class BranchesOnlySpec : Specification<TraceEvent>
     /// otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item) 
-        => item.BranchType.HasValue;
+        => item.Branch.HasValue;
 }

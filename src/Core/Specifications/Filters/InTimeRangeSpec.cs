@@ -26,5 +26,5 @@ internal sealed class InTimeRangeSpec(Timestamp start, Timestamp end) : Specific
     ///     ; otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
-        => item.Timestamp >= start && item.Timestamp <= end;
+        => item.Core.Timestamp >= start && item.Core.Timestamp <= end;
 }

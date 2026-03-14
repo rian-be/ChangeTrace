@@ -22,5 +22,5 @@ internal sealed class ByCommitSpec(CommitSha commitSha) : Specification<TraceEve
     /// otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
-        => item.CommitSha != null && item.CommitSha.Matches(commitSha);
+        => item.Commit.HasValue && item.Commit.Value.Sha.Matches(commitSha);
 }
