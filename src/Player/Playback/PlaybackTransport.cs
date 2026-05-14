@@ -25,7 +25,7 @@ internal sealed class PlaybackTransport : IPlaybackTransport
     private readonly Lock _lock = new();
 
     private PlayerState _state = PlayerState.Idle;
-    private const int DefaultTickMs = 16;
+    private const int DefaultTickMs = 7; // ~144fps tick rate
     
     /// <summary>Current state of the player.</summary>
     public PlayerState State { get { lock (_lock) return _state; } }

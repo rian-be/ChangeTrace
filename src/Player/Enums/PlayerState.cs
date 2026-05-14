@@ -1,7 +1,7 @@
 namespace ChangeTrace.Player.Enums;
 
 /// <summary>
-/// Represents current playback state of PlaybackTransport.
+/// Represents the current playback state of PlaybackTransport.
 /// </summary>
 /// <remarks>
 /// <list type="bullet">

@@ -1,9 +1,11 @@
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.Player.Enums;
 using ChangeTrace.Player.Interfaces;
 using ChangeTrace.Player.Playback;
 using Microsoft.Extensions.DependencyInjection;
+using ChangeTrace.Core.Diagnostics;
 
 namespace ChangeTrace.Player.Factory;
 
@@ -21,6 +23,12 @@ namespace ChangeTrace.Player.Factory;
 [AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class TimelinePlayerFactory : ITimelinePlayerFactory
 {
+    private readonly IDiagnosticsProvider _diagnostics;
+
+    public TimelinePlayerFactory(IDiagnosticsProvider diagnostics)
+    {
+        _diagnostics = diagnostics;
+    }
     /// <summary>
     /// Creates a new timeline player with all necessary components wired.
     /// </summary>
@@ -43,12 +51,14 @@ internal sealed class TimelinePlayerFactory : ITimelinePlayerFactory
         var cursor = new EventCursor(timeline.Events);
         
         var targetDuration = TimelineDurationCalculator.Calculate(timeline, secondsPerDay);
-        if (!timeline.IsNormalized)
-            timeline.Normalize(targetDuration);
+        var normResult = ChangeTrace.Core.Timelines.TimelineNormalizer.Normalize(timeline, targetDuration);
+        if (!normResult.IsSuccess)
+            throw new InvalidOperationException($"Timeline normalization failed: {normResult.Error}");
+
         
         var seekable = new SeekableTimeline(clock, cursor, targetDuration);
 
         var transport = new PlaybackTransport();
-        return new TimelinePlayer(clock, cursor, seekable, transport, mode);
+        return new TimelinePlayer(clock, cursor, seekable, transport, _diagnostics, mode);
     }
 }
