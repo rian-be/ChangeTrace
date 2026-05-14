@@ -1,28 +1,30 @@
+using System.Numerics;
+
 namespace ChangeTrace.Rendering.Animation;
 
 /// <summary>
-/// Represents single particle in animation/particle.
+/// Represents a single particle in animation/particle.
 /// Tracks position, velocity, lifetime, color, size, and transparency.
 /// </summary>
 internal sealed class Particle
 {
     /// <summary>Current position of the particle.</summary>
-    internal Vec2 Position { get; set; }
+    internal Vec2 Position { get; private set; }
 
     /// <summary>Current velocity of the particle.</summary>
-    internal Vec2 Velocity { get; set; }
+    private Vec2 Velocity { get; set; }
 
     /// <summary>Current alpha (opacity) of the particle. 1 = fully visible, 0 = invisible.</summary>
-    internal float Alpha { get; set; } = 1f;
+    internal float Alpha { get; private set; } = 1f;
 
     /// <summary>Radius/size of the particle.</summary>
-    internal float Size { get; set; } = 3f;
+    internal float Size { get; }
 
     /// <summary>Color of the particle, stored as packed RGB.</summary>
-    internal uint Color { get; }
+    internal Vector4 Color { get; }
 
     /// <summary>Total lifetime of the particle in seconds.</summary>
-    internal float Lifetime { get; }
+    private float Lifetime { get; }
 
     private float _elapsed;
 
@@ -34,7 +36,7 @@ internal sealed class Particle
     /// <param name="lifetime">Duration the particle lives in seconds.</param>
     /// <param name="color">Particle color (packed RGB).</param>
     /// <param name="size">Radius/size of the particle.</param>
-    internal Particle(Vec2 position, Vec2 velocity, float lifetime, uint color, float size)
+    internal Particle(Vec2 position, Vec2 velocity, float lifetime, Vector4 color, float size)
     {
         Position = position;
         Velocity = velocity;
@@ -52,7 +54,8 @@ internal sealed class Particle
     {
         _elapsed += dt;
         Position += Velocity * dt;
-        Velocity *= 0.97f; // apply simple friction
+        // Frame rate independent friction
+        Velocity *= MathF.Pow(0.9873f, dt * 144.0f); 
         Alpha = Math.Max(0f, 1f - _elapsed / Lifetime);
     }
 }

@@ -8,7 +8,7 @@ internal static class Easing
     /// <summary>Linear progression.</summary>
     internal static float Linear(float t) => t;
 
-    /// <summary>Quadratic easing in (accelerating from zero velocity).</summary>
+    /// <summary>Quadratic easing in (speeding up from zero velocity).</summary>
     internal static float EaseInQuad(float t) => t * t;
 
     /// <summary>Quadratic easing out (decelerating to zero velocity).</summary>
@@ -18,7 +18,7 @@ internal static class Easing
     internal static float EaseInOutQuad(float t) =>
         t < 0.5f ? 2f * t * t : -1f + (4f - 2f * t) * t;
 
-    /// <summary>Cubic easing in (accelerating from zero velocity).</summary>
+    /// <summary>Cubic easing in (speeding up from zero velocity).</summary>
     internal static float EaseInCubic(float t) => t * t * t;
 
     /// <summary>Cubic easing out (decelerating to zero velocity).</summary>
