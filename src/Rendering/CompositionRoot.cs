@@ -1,4 +1,4 @@
-using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.Player.Enums;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
@@ -6,7 +6,7 @@ using ChangeTrace.Rendering.Factory;
 namespace ChangeTrace.Rendering;
 
 /// <summary>
-/// Composition root for setting up and running rendering pipeline with timeline player.
+/// Composition root for setting up and running rendering pipeline with the timeline player.
 /// </summary>
 /// <remarks>
 /// This class is responsible for:
@@ -21,18 +21,22 @@ namespace ChangeTrace.Rendering;
 internal static class CompositionRoot
 {
     /// <summary>
-    /// Runs rendering pipeline for given timeline using specified factories.
+    /// Runs a rendering pipeline for a given timeline using specified factories.
     /// </summary>
     /// <param name="timeline">The timeline to visualize.</param>
     /// <param name="playerFactory">Factory for creating timeline player.</param>
     /// <param name="renderFactory">Factory for creating rendering system components.</param>
+    /// <param name="diagnostics">Diagnostics provider used by rendering pipeline.</param>
     /// <returns>A task that completes when playback finishes.</returns>
     internal static async Task RunAsync(
         Timeline timeline,
         ITimelinePlayerFactory playerFactory,
-        IRenderSystemFactory renderFactory)
+        IRenderSystemFactory renderFactory,
+        Core.Diagnostics.IDiagnosticsProvider diagnostics)
     {
-        timeline.Normalize();
+        var normResult = TimelineNormalizer.Normalize(timeline);
+        if (!normResult.IsSuccess)
+            throw new InvalidOperationException($"Timeline normalization failed: {normResult.Error}");
         
         var player = playerFactory.Create(
             timeline,
@@ -53,15 +57,16 @@ internal static class CompositionRoot
             translation,
             assembler,
             handlers,
-            new Vec2(1920f, 1080f));
+            new Vec2(1920f, 1080f),
+            diagnostics);
         
         pipeline.Player.Mode = PlaybackMode.Once;
-        pipeline.Player.TargetSpeed = 5.0;
+        pipeline.Player.TargetSpeed = 1.0;
         pipeline.Start();
         
         while (pipeline.Player.State != PlayerState.Finished)
             await Task.Delay(16);
 
-        Console.WriteLine(pipeline.Player.GetDiagnostics());
+        Console.WriteLine(pipeline.Player.GetDiagnostics().ToString());
     }
 }

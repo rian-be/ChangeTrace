@@ -18,5 +18,10 @@ internal enum EdgeKind
     /// <summary>
     /// Edge representing pull request.
     /// </summary>
-    PullRequest
+    PullRequest,
+
+    /// <summary>
+    /// Edge representing parent-child hierarchy (e.g., folder -> file).
+    /// </summary>
+    Hierarchy
 }
