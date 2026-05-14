@@ -1,6 +1,8 @@
+using System.Numerics;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Scene;
+using ChangeTrace.Rendering.Scene.Relations;
 
 namespace ChangeTrace.Rendering.Interfaces;
 
@@ -12,7 +14,7 @@ namespace ChangeTrace.Rendering.Interfaces;
 /// <see cref="SceneEdge"/>, and <see cref="ActorAvatar"/> objects.
 /// <para>
 /// Implementations are responsible for lifecycle management, lookup,
-/// and temporal updates (e.g. edge decay).
+/// and temporal updates (e.g., edge decay).
 /// </para>
 /// </remarks>
 internal interface ISceneGraph
@@ -28,19 +30,19 @@ internal interface ISceneGraph
     IReadOnlyDictionary<ActorName, ActorAvatar> Avatars { get; }
 
     /// <summary>
-    /// Gets collection of active edges.
+    /// Gets collections of active edges.
     /// </summary>
     IReadOnlyList<SceneEdge> Edges { get; }
 
     /// <summary>
-    /// Gets existing node or creates a new one if it does not exist.
+    /// Gets an existing node or creates a new one if it does not exist.
     /// </summary>
     /// <param name="id">Unique node identifier.</param>
     /// <param name="kind">Type of node.</param>
-    /// <param name="position">Initial position if node is created.</param>
-    /// <param name="color">Initial color if node is created.</param>
+    /// <param name="position">Initial position if a node is created.</param>
+    /// <param name="color">Initial color if a node is created.</param>
     /// <returns>Existing or newly created <see cref="SceneNode"/>.</returns>
-    SceneNode GetOrAddNode(string id, NodeKind kind, Vec2 position, uint color = 0xAAAAAA);
+    SceneNode GetOrAddNode(string id, NodeKind kind, Vec2 position, Vector4? color = null);
 
     /// <summary>
     /// Finds node by identifier.
@@ -56,13 +58,13 @@ internal interface ISceneGraph
     void RemoveNode(string id);
 
     /// <summary>
-    /// Gets existing avatar or creates new one if missing.
+    /// Gets an existing avatar or creates a new one if missing.
     /// </summary>
     /// <param name="actor">Actor identifier.</param>
     /// <param name="spawnPos">Initial spawn position if created.</param>
     /// <param name="color">Avatar color.</param>
     /// <returns>Existing or newly created <see cref="ActorAvatar"/>.</returns>
-    ActorAvatar GetOrAddAvatar(ActorName actor, Vec2 spawnPos, uint color);
+    ActorAvatar GetOrAddAvatar(ActorName actor, Vec2 spawnPos, Vector4 color);
 
     /// <summary>
     /// Finds avatar by actor.
@@ -72,7 +74,13 @@ internal interface ISceneGraph
     ActorAvatar? FindAvatar(ActorName actor);
 
     /// <summary>
-    /// Adds new edge between two nodes.
+    /// Removes avatar by actor name.
+    /// </summary>
+    void RemoveAvatar(ActorName actor);
+    void ClearAvatars();
+
+    /// <summary>
+    /// Adds a new edge between two nodes.
     /// </summary>
     /// <param name="fromId">Source node identifier.</param>
     /// <param name="toId">Target node identifier.</param>
@@ -80,6 +88,8 @@ internal interface ISceneGraph
     /// <param name="virtualTime">Virtual time of creation.</param>
     void AddEdge(string fromId, string toId, EdgeKind kind, double virtualTime);
 
+    void AddBundledEdge(string fromId, IEnumerable<string> toIds, EdgeKind kind, double virtualTime);
+    
     /// <summary>
     /// Updates edges based on current virtual time.
     /// </summary>
