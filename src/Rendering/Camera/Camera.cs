@@ -29,7 +29,7 @@ internal sealed class Camera
     /// <summary>
     /// Minimum allowed zoom.
     /// </summary>
-    internal const float MinZoom = 0.05f;
+    internal const float MinZoom = 0.15f;
 
     /// <summary>
     /// Maximum allowed zoom.

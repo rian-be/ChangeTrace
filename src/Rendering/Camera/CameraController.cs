@@ -54,6 +54,9 @@ internal sealed class CameraController : ICameraController
     /// <param name="viewportSize">Size of the viewport in pixels.</param>
     public void Tick(ISceneGraph scene, float dt, Vec2 viewportSize)
     {
+        if (Mode == CameraFollowMode.Free)
+            return;
+        
         var target = Mode switch
         {
             CameraFollowMode.FollowAverage => ComputeCenterOfMass(scene),
@@ -66,6 +69,27 @@ internal sealed class CameraController : ICameraController
             SmoothMove(target.Value, dt);
     }
 
+    public void Pan(Vec2 delta)
+    {
+        Mode = CameraFollowMode.Free;
+        _camera.Position += delta;
+    }
+
+    public void Zoom(float deltaZoom)
+    {
+        Mode = CameraFollowMode.Free;
+        _camera.Zoom = Math.Clamp(
+            _camera.Zoom + deltaZoom,
+            Camera.MinZoom,
+            Camera.MaxZoom);
+    }
+
+    public void SetPosition(Vec2 position)
+    {
+        Mode = CameraFollowMode.Free;
+        _camera.Position = position;
+    }
+    
     /// <summary>
     /// Smoothly moves camera toward target position.
     /// </summary>
