@@ -1,0 +1,35 @@
+﻿{
+  "cell": 32,
+  "columns": 8,
+  "rows": 1,
+  "width": 256,
+  "height": 32,
+  "icons": {
+    "cplusplus-plain": {
+      "index": 0,
+      "enum": "CplusplusPlain",
+      "file": "cplusplus-plain.svg",
+      "x": 0,
+      "y": 0,
+      "w": 32,
+      "h": 32,
+      "u": 0,
+      "v": 0,
+      "uw": 0,125,
+      "vh": 1
+    },
+    "csharp-plain": {
+      "index": 1,
+      "enum": "CsharpPlain",
+      "file": "csharp-plain.svg",
+      "x": 32,
+      "y": 0,
+      "w": 32,
+      "h": 32,
+      "u": 0,125,
+      "v": 0,
+      "uw": 0,125,
+      "vh": 1
+    }
+  }
+}
