@@ -7,38 +7,31 @@ using ChangeTrace.Rendering.Interfaces;
 namespace ChangeTrace.Rendering.Processors.Handlers;
 
 /// <summary>
-/// Handles <see cref="MoveActorCommand"/> by moving actor avatars in the scene graph.
+/// Handles actor avatar movement commands.
 /// </summary>
-/// <remarks>
-/// Actors are moved towards the target node with a smooth tween animation. If the
-/// actor is spawning, a random start position is chosen near scene edges. Activity
-/// levels and timestamps are updated, and the <see cref="IRenderStateAssembler"/>
-/// records the actor event for telemetry or HUD purposes.
-/// </remarks>
 internal sealed class MoveActorHandler(
-    ISceneGraph scene, 
-    IAnimationSystem anim, 
-    IRenderStateAssembler assembler
-) : IRenderCommandHandler
+    ISceneGraph scene,
+    IAnimationSystem anim,
+    IRenderStateAssembler assembler)
+    : IRenderCommandHandler
 {
     /// <summary>
-    /// Duration in seconds for avatar movement animations.
+    /// Duration of avatar movement animation.
     /// </summary>
-    private float AvatarMoveDuration { get; set; } = 0.4f;
+    private float AvatarMoveDuration { get; set; } =  1.2f;
 
     /// <summary>
-    /// Gets <see cref="RenderCommand"/> type this handler can process.
+    /// Supported render command type.
     /// </summary>
-    public Type CommandType => typeof(MoveActorCommand);
+    public Type CommandType =>
+        typeof(MoveActorCommand);
 
     /// <summary>
-    /// Processes given <see cref="MoveActorCommand"/> and updates actor avatar.
+    /// Applies actor movement command to the scene graph.
     /// </summary>
-    /// <param name="command">The command to handle.</param>
-    /// <param name="virtualTime">Current virtual timeline time (seconds).</param>
     public void Handle(RenderCommand command, double virtualTime)
     {
-        var (_, actorName, targetNodeId, isSpawn) = (MoveActorCommand)command;
+        var (_, actorName, targetNodeId, isSpawn, commitSha) = (MoveActorCommand)command;
 
         var targetNode = scene.FindNode(targetNodeId);
         if (targetNode == null) 
@@ -53,16 +46,33 @@ internal sealed class MoveActorHandler(
 
         var avatar = scene.GetOrAddAvatar(actorName, spawnPos, color);
 
+        // Smart Cooldown: If this avatar just performed an action in the SAME virtual time slice,
+        // don't perform a full reset. This prevents "immortality" in dense event streams.
+        if (Math.Abs(avatar.LastSeen - virtualTime) < 0.001 && !isSpawn && avatar.TargetNodeId == targetNodeId)
+            return;
+
+        // If already at target, only bump activity slightly to allow decay to eventually win
+        if (avatar.TargetNodeId == targetNodeId && !isSpawn)
+        {
+            avatar.LastSeen = virtualTime;
+            avatar.ActivityLevel = Math.Min(1.0f, avatar.ActivityLevel + 0.2f);
+            return;
+        }
+
         avatar.LastSeen = virtualTime;
         avatar.ActivityLevel = 1f;
-        avatar.Target = targetNode.Position;
+        avatar.TargetNodeId = targetNodeId;
+
+        // Drift target with offset
+        var offset = RenderingHelpers.RandomNear() * 20f;
+        var to = targetNode.Position + offset;
+        avatar.Target = to;
 
         var from = avatar.Position;
-        var to = targetNode.Position;
 
         anim.TweenVec2(from, to, AvatarMoveDuration, Easing.EaseOutCubic,
-            pos => avatar.Position = pos);
+            pos => avatar.Position = pos, null, actorName.Value);
 
-        assembler.RecordActorEvent(actorName.Value);
+        assembler.RecordActorEvent(actorName.Value, commitSha);
     }
 }

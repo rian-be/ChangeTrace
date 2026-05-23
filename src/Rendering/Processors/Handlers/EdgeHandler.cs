@@ -1,31 +1,35 @@
+using System.Numerics;
 using ChangeTrace.Rendering.Commands;
+using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Interfaces;
-using ChangeTrace.Rendering.Scene;
 
 namespace ChangeTrace.Rendering.Processors.Handlers;
 
 /// <summary>
-/// Handles <see cref="EdgeCommand"/> by adding edges between nodes in scene.
+/// Handles edge creation commands.
 /// </summary>
-/// <remarks>
-/// Each edge is created with specified kind and timestamp in virtual time.
-/// Edge fading and lifetime are managed by <see cref="SceneGraph.TickEdges"/>.
-/// </remarks>
-internal sealed class EdgeHandler(ISceneGraph scene) : IRenderCommandHandler
+internal sealed class EdgeHandler(
+    ISceneGraph scene)
+    : IRenderCommandHandler
 {
     /// <summary>
-    /// Gets <see cref="RenderCommand"/> type this handler can process.
+    /// Supported render command type.
     /// </summary>
-    public Type CommandType => typeof(EdgeCommand);
+    public Type CommandType =>
+        typeof(EdgeCommand);
 
     /// <summary>
-    /// Processes given <see cref="EdgeCommand"/> and adds an edge to scene.
+    /// Applies edge command to the scene graph.
     /// </summary>
-    /// <param name="command">The render command to handle.</param>
-    /// <param name="virtualTime">Current virtual timeline time (seconds).</param>
     public void Handle(RenderCommand command, double virtualTime)
     {
         var cmd = (EdgeCommand)command;
-        scene.AddEdge(cmd.FromNode, cmd.ToNode, cmd.Kind, virtualTime);
+        var fromNode = scene.FindNode(cmd.FromNode) 
+                       ?? scene.GetOrAddNode(cmd.FromNode, NodeKind.Root, new Vec2(0,0), new Vector4(1,1,0,1));
+
+        var toNode = scene.FindNode(cmd.ToNode) 
+                     ?? scene.GetOrAddNode(cmd.ToNode, NodeKind.File, new Vec2(0,0), new Vector4(1,1,1,1));
+
+        scene.AddEdge(fromNode.Id, toNode.Id, cmd.Kind, virtualTime);
     }
 }
