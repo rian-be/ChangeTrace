@@ -5,11 +5,8 @@ using OpenTK.Graphics.OpenGL4;
 namespace ChangeTrace.Graphics.Gpu.Pipelines.Base;
 
 /// <summary>
-/// Base pipeline for compute-driven texture generation or modification.
+/// Base pipeline for compute-driven texture generation or processing.
 /// </summary>
-/// <typeparam name="TData">
-/// The unmanaged GPU input data type consumed by the compute shader.
-/// </typeparam>
 internal abstract class TextureComputePipeline<TData>(
     int width,
     int height,
@@ -19,18 +16,18 @@ internal abstract class TextureComputePipeline<TData>(
     where TData : unmanaged
 {
     /// <summary>
-    /// Compute shader used by this pipeline.
+    /// Compute shader used by the pipeline.
     /// </summary>
     protected readonly ComputeShader Shader = shader;
 
     /// <summary>
-    /// Input data buffer consumed by compute shader.
+    /// Input data uploaded to GPU storage.
     /// </summary>
-    protected readonly ShaderStorageBuffer<TData> InputSsbo =
+    protected readonly ShaderStorageBuffer<TData> InputStorageBuffer =
         new();
 
     /// <summary>
-    /// OpenGL texture handle written or read by compute shader.
+    /// Texture handle processed by the compute shader.
     /// </summary>
     protected readonly int TextureHandle = textureHandle;
 
@@ -50,68 +47,90 @@ internal abstract class TextureComputePipeline<TData>(
     protected int ItemCount;
 
     /// <summary>
-    /// Dispatches compute a shader over a texture-sized two-dimensional work grid.
+    /// Dispatches compute work over the texture area.
     /// </summary>
-    /// <param name="localSizeX"> Local work group size on X axis. </param>
-    /// <param name="localSizeY"> Local work group size on Y axis. </param>
-    protected void Dispatch2D(int localSizeX = 16, int localSizeY = 16) =>
+    protected void Dispatch2D(
+        int localSizeX = 16,
+        int localSizeY = 16)
+    {
         GL.DispatchCompute(
             (_width + localSizeX - 1) / localSizeX,
             (_height + localSizeY - 1) / localSizeY,
             1);
+    }
 
     /// <summary>
-    /// Binds pipeline texture as image unit.
+    /// Binds the pipeline texture as an image texture.
     /// </summary>
-    /// <param name="binding"> Image unit binding index. </param>
-    /// <param name="access"> Texture image access mode. </param>
-    /// <param name="format"> Sized image format used for shader access. </param>
     protected void BindImageTexture(
         int binding,
         TextureAccess access,
-        SizedInternalFormat format) =>
-        GL.BindImageTexture(binding, TextureHandle, 0, false, 0, access, format);
+        SizedInternalFormat format)
+    {
+        GL.BindImageTexture(
+            binding,
+            TextureHandle,
+            0,
+            false,
+            0,
+            access,
+            format);
+    }
 
     /// <summary>
-    /// Unbinds image texture from a specified image unit.
+    /// Unbinds an image texture binding.
     /// </summary>
-    /// <param name="binding"> Image unit binding index. </param>
-    /// <param name="access"> Texture image access mode. </param>
-    /// <param name="format"> Sized image format used for shader access. </param>
     protected void UnbindImageTexture(
         int binding,
         TextureAccess access,
-        SizedInternalFormat format) =>
-        GL.BindImageTexture(binding, 0, 0, false, 0, access, format);
+        SizedInternalFormat format)
+    {
+        GL.BindImageTexture(
+            binding,
+            0,
+            0,
+            false,
+            0,
+            access,
+            format);
+    }
 
     /// <summary>
-    /// Synchronizes shader storage, image writes, and texture fetches.
+    /// Synchronizes shader storage and texture access.
     /// </summary>
     protected void Barrier()
     {
-        GL.MemoryBarrier(
-            MemoryBarrierFlags.ShaderStorageBarrierBit |
-            MemoryBarrierFlags.ShaderImageAccessBarrierBit |
-            MemoryBarrierFlags.TextureFetchBarrierBit);
+        const MemoryBarrierFlags barriers =
+            (MemoryBarrierFlags)(
+                MemoryBarrierFlags.ShaderStorageBarrierBit |
+                MemoryBarrierFlags.ShaderImageAccessBarrierBit |
+                MemoryBarrierFlags.TextureFetchBarrierBit);
+
+        GL.MemoryBarrier(barriers);
     }
 
     /// <summary>
     /// Binds the input storage buffer to a shader binding point.
     /// </summary>
-    /// <param name="binding"> Shader storage binding index. </param>
-    protected void BindInputBuffer(int binding = 0) =>
-        InputSsbo.BindBase(binding);
+    protected void BindInputBuffer(int binding = 0)
+    {
+        InputStorageBuffer.BindBase(binding);
+    }
 
     /// <summary>
-    /// Unbinds input storage buffer from the shader binding point.
+    /// Unbinds input storage buffer.
     /// </summary>
-    /// <param name="binding"> Shader storage binding index. </param>
-    protected void UnbindInputBuffer(int binding = 0) =>
-        GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, binding, 0);
-    
+    protected void UnbindInputBuffer(int binding = 0)
+    {
+        GL.BindBufferBase(
+            BufferRangeTarget.ShaderStorageBuffer,
+            binding,
+            0);
+    }
+
     public virtual void Dispose()
     {
-        InputSsbo.Dispose();
+        InputStorageBuffer.Dispose();
         GL.DeleteTexture(TextureHandle);
     }
 }
