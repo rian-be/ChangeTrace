@@ -1,195 +1,202 @@
 using System.Numerics;
 using ChangeTrace.Rendering.Enums;
+using ChangeTrace.Rendering.Scene.Graph;
 
 namespace ChangeTrace.Rendering.Scene;
 
 /// <summary>
-/// Represents a mutable node instance in the scene graph.
+/// Shared scene node identifiers.
 /// </summary>
-/// <remarks>
-/// Stores per-node spatial state, cached display metadata, and flyweight-backed static rendering properties.
-/// </remarks>
+internal static class SceneIds
+{
+    internal const string Root = "__repo_root__";
+    internal const string RootLabel = "Repository";
+}
+
+/// <summary>
+/// Mutable scene graph node.
+/// </summary>
 internal sealed class SceneNode
 {
     private readonly NodeFlyweight _flyweight;
 
-    /// <summary>
-    /// Gets flyweight containing shared node properties.
-    /// </summary>
-    internal NodeFlyweight Flyweight => _flyweight;
+    private float _forceX;
+    private float _forceY;
+
+    internal SceneNode(
+        string id,
+        NodeKind kind,
+        Vec2 position,
+        Vector4? color = null)
+    {
+        Id = SceneNodeIds.Normalize(id, kind);
+        _flyweight = NodeFlyweightFactory.ForKind(kind);
+
+        Position = position;
+        HomePosition = position;
+        Color = color ?? new Vector4(1f);
+
+        int lastSlash = Id.LastIndexOf('/');
+
+        ParentId = SceneNodeIds.ResolveParentId(Id, kind);
+        Label = ResolveLabel(Id, kind, lastSlash);
+        Extension = ResolveExtension(kind, Label);
+        CachedColor = ResolveCachedColor(kind, Id);
+    }
 
     /// <summary>
-    /// Gets unique scene node identifier.
+    /// Shared immutable node data.
+    /// </summary>
+    internal NodeFlyweight Flyweight =>
+        _flyweight;
+
+    /// <summary>
+    /// Stable scene node identifier.
     /// </summary>
     internal string Id { get; }
 
     /// <summary>
-    /// Gets display label derived from node identifier.
+    /// Display label.
     /// </summary>
     internal string Label { get; }
 
     /// <summary>
-    /// Gets file extension for file nodes.
+    /// File extension for file nodes.
     /// </summary>
-    internal string Extension { get; } = "";
+    internal string Extension { get; }
 
     /// <summary>
-    /// Gets or sets whether a node acts as a parent in scene hierarchy.
+    /// Indicates whether this node has children.
     /// </summary>
     internal bool IsParent { get; set; }
 
     /// <summary>
-    /// Gets node kind.
+    /// Node type.
     /// </summary>
-    internal NodeKind Kind => _flyweight.Kind;
+    internal NodeKind Kind =>
+        _flyweight.Kind;
 
     /// <summary>
-    /// Gets or sets current world position.
+    /// Current world position.
     /// </summary>
     internal Vec2 Position { get; set; }
 
     /// <summary>
-    /// Gets or sets a preferred layout position.
+    /// Layout home position.
     /// </summary>
     internal Vec2 HomePosition { get; set; }
 
     /// <summary>
-    /// Gets or sets the current layout velocity.
+    /// Current layout velocity.
     /// </summary>
     internal Vec2 Velocity { get; set; }
 
-    private float _forceX;
-    private float _forceY;
-
     /// <summary>
-    /// Gets or sets accumulated layout force.
+    /// Accumulated layout force.
     /// </summary>
     internal Vec2 Force
     {
-        get => new Vec2(_forceX, _forceY);
-        set { _forceX = value.X; _forceY = value.Y; }
-    }
-
-    /// <summary>
-    /// Adds force to the node using atomic float accumulation.
-    /// </summary>
-    /// <param name="f">Force vector to add.</param>
-    public void AddForce(Vec2 f)
-    {
-        AddFloat(ref _forceX, f.X);
-        AddFloat(ref _forceY, f.Y);
-    }
-
-    /// <summary>
-    /// Atomically adds floating-point value to a specified storage location.
-    /// </summary>
-    /// <param name="location">Storage location to update.</param>
-    /// <param name="value">Value to add.</param>
-    private static void AddFloat(ref float location, float value)
-    {
-        do
+        get => new(_forceX, _forceY);
+        set
         {
-            var current = location;
-            float updated = current + value;
-            float original = Interlocked.CompareExchange(
-                ref location,
-                updated,
-                current);
-
-            if (BitConverter.SingleToInt32Bits(original) ==
-                BitConverter.SingleToInt32Bits(current))
-            {
-                break;
-            }
+            _forceX = value.X;
+            _forceY = value.Y;
         }
-        while (true);
     }
 
     /// <summary>
-    /// Gets node mass used by layout simulation.
+    /// Node mass used by layout simulation.
     /// </summary>
-    internal float Mass => _flyweight.Mass;
+    internal float Mass =>
+        _flyweight.Mass;
 
     /// <summary>
-    /// Gets node render radius.
+    /// Node radius used by rendering and layout.
     /// </summary>
-    internal float Radius => _flyweight.Radius;
+    internal float Radius =>
+        _flyweight.Radius;
 
     /// <summary>
-    /// Gets or sets the current render color.
+    /// Current node color.
     /// </summary>
     internal Vector4 Color { get; set; }
 
     /// <summary>
-    /// Gets or sets emissive glow intensity.
+    /// Current glow intensity.
     /// </summary>
     internal float Glow { get; set; }
 
     /// <summary>
-    /// Gets or sets the last author associated with this node.
+    /// The last author touching this node.
     /// </summary>
     internal string? LastAuthor { get; set; }
 
     /// <summary>
-    /// Gets or sets the last commit identifier associated with this node.
+    /// The last commit touching this node.
     /// </summary>
     internal string? LastCommit { get; set; }
 
     /// <summary>
-    /// Gets or sets parent node identifier.
+    /// Parent node identifier.
     /// </summary>
     internal string? ParentId { get; set; }
 
     /// <summary>
-    /// Gets or sets whether the layout fixes the node position.
+    /// Prevents layout from moving this node.
     /// </summary>
     internal bool Pinned { get; set; }
 
     /// <summary>
-    /// Gets or sets child index inside parent groups.
-    /// </summary>
-    internal int ChildIndex { get; set; }
-
-    /// <summary>
-    /// Gets or sets sibling index inside layout groups.
-    /// </summary>
-    internal int SiblingIndex { get; set; }
-
-    /// <summary>
-    /// Gets stable color derived from the node kind or file path.
+    /// Cached semantic node color.
     /// </summary>
     internal Vector4 CachedColor { get; }
 
     /// <summary>
-    /// Creates a scene node with identifier, kind, position, and optional color override.
+    /// Resolves node display label.
     /// </summary>
-    /// <param name="id">Unique scene node identifier.</param>
-    /// <param name="kind">Node kind.</param>
-    /// <param name="position">Initial world position.</param>
-    /// <param name="color">Optional initial render color.</param>
-    internal SceneNode(string id, NodeKind kind, Vec2 position, Vector4? color = null)
+    private static string ResolveLabel(
+        string id,
+        NodeKind kind,
+        int lastSlash)
     {
-        Id = id;
-        _flyweight = NodeFlyweightFactory.ForKind(kind);
-        Position = position;
-        HomePosition = position;
-        Color = color ?? new Vector4(1f, 1f, 1f, 1f);
-
-        int lastSlash = id.LastIndexOf('/');
-        ParentId = lastSlash >= 0 ? id.Substring(0, lastSlash) : null;
-        Label = lastSlash >= 0 ? id.Substring(lastSlash + 1) : id;
-
-        if (kind == NodeKind.File)
-        {
-            int lastDot = Label.LastIndexOf('.');
-            Extension = lastDot >= 0 ? Label.Substring(lastDot).ToLowerInvariant() : "";
-        }
-
         if (kind == NodeKind.Root)
-            CachedColor = new Vector4(1, 0.8f, 0.3f, 1);
-        else if (kind == NodeKind.Branch)
-            CachedColor = new Vector4(0.6f, 0.6f, 0.6f, 0.5f);
-        else
-            CachedColor = Colors.ColorPalette.ForFilePath(id);
+            return SceneIds.RootLabel;
+
+        return lastSlash >= 0
+            ? id[(lastSlash + 1)..]
+            : id;
+    }
+
+    /// <summary>
+    /// Resolves file extension for file nodes.
+    /// </summary>
+    private static string ResolveExtension(
+        NodeKind kind,
+        string label)
+    {
+        if (kind != NodeKind.File)
+            return "";
+
+        int lastDot =
+            label.LastIndexOf('.');
+
+        return lastDot >= 0
+            ? label[lastDot..].ToLowerInvariant()
+            : "";
+    }
+
+    /// <summary>
+    /// Resolves cached semantic color.
+    /// </summary>
+    private static Vector4 ResolveCachedColor(
+        NodeKind kind,
+        string id)
+    {
+        return kind switch
+        {
+            NodeKind.Root => new Vector4(1f, 0.8f, 0.3f, 1f),
+            NodeKind.Branch => new Vector4(0.6f, 0.6f, 0.6f, 0.5f),
+            _ => Colors.ColorPalette.ForFilePath(id)
+        };
     }
 }
