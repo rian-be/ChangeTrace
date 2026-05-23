@@ -38,4 +38,25 @@ internal sealed class RenderingOptions
     /// Gets a value indicating whether file coupling events should be rendered.
     /// </summary>
     public bool RenderFileCoupling => EnabledEvents.HasFlag(RenderEventKinds.FileCoupling);
+
+    /// <summary>
+    /// Gets or sets the layout visualization mode.
+    /// </summary>
+    public LayoutMode Mode { get; set; } = LayoutMode.SingleTree;
+}
+
+/// <summary>
+/// Defines the visual structure of the project tree.
+/// </summary>
+internal enum LayoutMode
+{
+    /// <summary>
+    /// Classic Gource style where everything is connected to a single root.
+    /// </summary>
+    SingleTree,
+
+    /// <summary>
+    /// Independent trees for main folders, better for massive repositories.
+    /// </summary>
+    Forest
 }
