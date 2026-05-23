@@ -1,115 +1,93 @@
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Player;
-using ChangeTrace.Rendering.Colors;
 using ChangeTrace.Rendering.Hud;
 using ChangeTrace.Rendering.Interfaces;
+using ChangeTrace.Rendering.Scene;
 using ChangeTrace.Rendering.Snapshots;
+using ChangeTrace.Rendering.States.Avatars;
+using ChangeTrace.Rendering.States.Edges;
+using ChangeTrace.Rendering.States.Hud;
+using ChangeTrace.Rendering.States.Nodes;
+using ChangeTrace.Rendering.States.Particles;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.States;
 
 /// <summary>
-/// Responsible for assembling immutable <see cref="RenderState"/> instances
-/// from mutable rendering subsystems on each simulation tick.
+/// Builds complete render state snapshots for the renderer pipeline.
 /// </summary>
-/// <remarks>
-/// <para>
-/// This class snapshots scene graph, animation system, camera, and diagnostics
-/// into single immutable frame representation.
-/// </para>
-/// <para>
-/// It also tracks per actor activity counts used to construct HUD leaderboard.
-/// </para>
-/// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class RenderStateAssembler : IRenderStateAssembler
 {
-    private readonly Dictionary<string, int> _actorEventCounts = new();
+    private readonly NodeSnapshotAssembler _nodes = new();
+    private readonly AvatarSnapshotAssembler _avatars = new();
+    private readonly EdgeSnapshotAssembler _edges = new();
+    private readonly ParticleSnapshotAssembler _particles = new();
+
+    private readonly ExtensionStatisticsAssembler _extensions = new();
+    private readonly LeaderboardAssembler _leaderboard = new();
+    private readonly HudStateAssembler _hud = new();
 
     /// <summary>
-    /// Records an event occurrence for specified actor.
+    /// Records contributor activity for leaderboard tracking.
     /// </summary>
-    /// <param name="actor">Actor identifier.</param>
-    /// <remarks>
-    /// Used to compute leaderboard rankings in HUD snapshot.
-    /// </remarks>
-    public void RecordActorEvent(string actor)
-        => _actorEventCounts[actor] = _actorEventCounts.GetValueOrDefault(actor) + 1;
+    public void RecordActorEvent(string actor, string commitSha) =>
+        _leaderboard.RecordActorEvent(actor);
     
     /// <summary>
-    /// Creates new immutable <see cref="RenderState"/> snapshot for current tick.
+    /// Clears accumulated render-related state.
     /// </summary>
-    /// <param name="virtualTime">Current simulation time in virtual seconds.</param>
-    /// <param name="wallDelta">Elapsed real-world time since previous frame.</param>
-    /// <param name="scene">Mutable scene graph.</param>
-    /// <param name="anim">Animation and particle system.</param>
-    /// <param name="camera">Active camera instance.</param>
-    /// <param name="diagnostics">Playback diagnostics and timing information.</param>
-    /// <returns>A fully assembled <see cref="RenderState"/>.</returns>
+    public void Reset() =>
+        _leaderboard.Reset();
+
+    /// <summary>
+    /// Assembles a full immutable render state snapshot.
+    /// </summary>
     public RenderState Assemble(
         double virtualTime,
         double wallDelta,
         ISceneGraph scene,
-        IAnimationSystem anim,
+        IAnimationSystem animationSystem,
         Camera.Camera camera,
-        PlayerDiagnostics diagnostics)
+        ICameraController cameraController,
+        PlayerDiagnostics diagnostics,
+        SceneNode? hoveredNode,
+        HoveredPodHud? hoveredPod,
+        LayoutMode layoutMode)
     {
-        var sceneSnapshot= new SceneSnapshot(
-            nodes: Snapshot(scene.Nodes.Values, static n => new NodeSnapshot(n.Id, n.Position, n.Radius, n.Color, n.Glow, n.Kind)),
-            avatars: Snapshot(scene.Avatars.Values, static a => new AvatarSnapshot(a.Actor.Value, a.Position, a.Color, a.Alpha, a.ActivityLevel)),
-            edges: Snapshot(scene.Edges, static e => new EdgeSnapshot(e.FromId, e.ToId, e.Kind, e.Alpha, ColorPalette.ForEdge(e.Kind))),
-            particles: Snapshot(anim.Particles, static p => new ParticleSnapshot(p.Position, p.Alpha, p.Size, p.Color))
-        );
-        
+        var nodeSnapshots = _nodes.Assemble(scene.Nodes);
+        var avatarSnapshots = _avatars.Assemble(scene.Avatars, out var activeAvatarsCount);
+        var edgeSnapshots = _edges.Assemble(scene);
+        var particleSnapshots = _particles.Assemble(animationSystem);
+        var extensions = _extensions.Assemble(scene);
+        var leaderboard = _leaderboard.Assemble();
+
+        var hudState =
+            _hud.Assemble(
+                diagnostics,
+                cameraController,
+                layoutMode,
+                hoveredNode,
+                hoveredPod,
+                activeAvatarsCount,
+                scene.Nodes.Count,
+                extensions,
+                leaderboard);
+
+        var sceneSnapshot =
+            new SceneSnapshot(
+                nodeSnapshots,
+                avatarSnapshots,
+                edgeSnapshots,
+                particleSnapshots);
+
         return new RenderState(
-            VirtualTime:  virtualTime,
-            WallDelta:    wallDelta,
-            Progress:     diagnostics.Progress,
-            CurrentSpeed: diagnostics.CurrentSpeed,
-            Scene:        sceneSnapshot,
-            Camera:       new CameraSnapshot(camera.Position, camera.Zoom, camera.Rotation),
-            Hud:          BuildHud(diagnostics, sceneSnapshot));
+            virtualTime,
+            wallDelta,
+            sceneSnapshot,
+            camera.ToSnapshot(),
+            hudState,
+            layoutMode,
+            diagnostics.ManagedMemoryMb);
     }
-    
-    /// <summary>
-    /// Creates an immutable projection of collection.
-    /// </summary>
-    /// <typeparam name="TIn">Source element type.</typeparam>
-    /// <typeparam name="TOut">Snapshot element type.</typeparam>
-    /// <param name="source">Source collection.</param>
-    /// <param name="projector">Projection function.</param>
-    /// <returns>An immutable list containing projected elements.</returns>
-    /// <remarks>
-    /// If source implements <see cref="ICollection{T}"/>, capacity is preallocated
-    /// for performance and allocation efficiency.
-    /// </remarks>
-    private static IReadOnlyList<TOut> Snapshot<TIn, TOut>(
-        IEnumerable<TIn> source,
-        Func<TIn, TOut> projector)
-    {
-        if (source is not ICollection<TIn> collection) return source.Select(projector).ToList();
-        var result = new List<TOut>(collection.Count);
-        result.AddRange(collection.Select(projector));
-        return result;
-    }
-    
-    private HudState BuildHud(PlayerDiagnostics diagnostics, SceneSnapshot snapshot)
-    {
-        var stats = snapshot.ComputeStats();
-
-        return HudBuilder.Build(
-            diagnostics,
-            stats.ActiveAvatars,
-            stats.NodeCount,
-            BuildLeaderboard());
-    }
-    
-    private LeaderboardEntry[] BuildLeaderboard()
-        => _actorEventCounts
-            .OrderByDescending(kv => kv.Value)
-            .Take(10)
-            .Select(kv => new LeaderboardEntry(kv.Key, kv.Value))
-            .ToArray();
-
-    public void Reset() => _actorEventCounts.Clear();
 }
