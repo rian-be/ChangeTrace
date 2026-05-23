@@ -1,5 +1,6 @@
 using ChangeTrace.Core;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Delegates;
 using ChangeTrace.GIt.Options;
 

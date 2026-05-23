@@ -86,7 +86,7 @@ internal sealed class VirtualClock : IVirtualClock
     public void Reanchor()
         => _speed.Reanchor(WallNow, VirtualNow);
 
-    /// <summary>Freezes the virtual clock at current position and speed.</summary>
+    /// <summary>Freezes the virtual clock at current position, effectively stopping virtual time progression.</summary>
     public void Freeze()
-        => _speed.SnapTo(WallNow, VirtualNow, _speed.CurrentSpeed);
+        => _speed.SnapTo(WallNow, VirtualNow, 0.0);
 }

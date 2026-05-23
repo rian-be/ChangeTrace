@@ -25,6 +25,6 @@ internal sealed class ByExtensionSpec(string extension) : Specification<TraceEve
     /// <c>true</c> when the file path has the specified extension; otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
-        => item.FilePath != null &&
-           item.FilePath.Extension.Equals(_extension, StringComparison.OrdinalIgnoreCase);
+        => item.Metadata?.FilePath != null &&
+           item.Metadata.Value.FilePath.Extension.Equals(_extension, StringComparison.OrdinalIgnoreCase);
 }

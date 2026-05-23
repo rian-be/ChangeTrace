@@ -1,6 +1,7 @@
 using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Dto;
 using ChangeTrace.GIt.Interfaces;
 using MessagePack;
@@ -41,7 +42,39 @@ internal sealed class MessagePackTimelineSerializer : ITimelineSerializer
     /// <returns>Deserialized <see cref="Timeline"/> instance.</returns>
     public Task<Timeline> DeserializeAsync(byte[] data, CancellationToken cancellationToken = default)
     {
-        var dto = MessagePackSerializer.Deserialize<TimelineDto>(data, Options, cancellationToken);
-        return Task.FromResult(dto.ToDomain());
+        try
+        {
+            Console.WriteLine($"[MessagePackSerializer] Deserializing {data.Length} bytes...");
+        
+            var dto = MessagePackSerializer.Deserialize<TimelineDto>(data, Options, cancellationToken);
+        
+            if (dto == null)
+            {
+                Console.WriteLine("[MessagePackSerializer] ERROR: DTO is null after deserialization!");
+                throw new InvalidOperationException("Deserialized DTO is null");
+            }
+        
+            Console.WriteLine($"[MessagePackSerializer] DTO deserialized successfully");
+            Console.WriteLine($"[MessagePackSerializer] Converting to domain model...");
+        
+            var timeline = dto.ToDomain();
+        
+            if (timeline == null)
+            {
+                Console.WriteLine("[MessagePackSerializer] ERROR: ToDomain() returned null!");
+                throw new InvalidOperationException("ToDomain() returned null");
+            }
+        
+            Console.WriteLine($"[MessagePackSerializer] Timeline created with {timeline.Events?.Count ?? 0} events");
+            return Task.FromResult(timeline);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MessagePackSerializer] EXCEPTION during deserialization:");
+            Console.WriteLine($"  Type: {ex.GetType().Name}");
+            Console.WriteLine($"  Message: {ex.Message}");
+            Console.WriteLine($"  Stack:\n{ex.StackTrace}");
+            throw;
+        }
     }
 }

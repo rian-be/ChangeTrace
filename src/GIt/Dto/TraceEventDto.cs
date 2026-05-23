@@ -12,7 +12,7 @@ namespace ChangeTrace.GIt.Dto;
 /// Used for serialization, persistence, and inter-process transfer.
 /// </summary>
 /// <remarks>
-/// This DTO captures all relevant properties of a timeline event, including:
+/// This DTO captures all relevant properties of a timeline event, including
 /// - Commit, branch, and pull request metadata  
 /// - File changes  
 /// - Merge events  
@@ -40,17 +40,17 @@ internal sealed record TraceEventDto
     /// </summary>
     internal static TraceEventDto FromDomain(TraceEvent evt) => new()
     {
-        Timestamp = evt.Timestamp.UnixSeconds,
-        Actor = evt.Actor.Value,
+        Timestamp = evt.Core.Timestamp.UnixSeconds,
+        Actor = evt.Core.Actor.Value,
         Target = evt.Target,
-        Metadata = evt.Metadata,
-        CommitSha = evt.CommitSha?.Value,
-        BranchName = evt.BranchName?.Value,
-        PullRequestNumber = evt.PullRequestNumber?.Value,
-        FilePath = evt.FilePath?.Value,
-        CommitType = evt.CommitType?.ToString(),
-        BranchType = evt.BranchType?.ToString(),
-        PrType = evt.PrType?.ToString()
+        Metadata = evt.Metadata?.Metadata,
+        CommitSha = evt.Commit?.Sha.Value,
+        BranchName = evt.Branch?.Name.Value,
+        PullRequestNumber = evt.PullRequest?.Number.Value,
+        FilePath = evt.Metadata?.FilePath,
+        CommitType = evt.Commit?.Type.ToString(),
+        BranchType = evt.Branch?.Type.ToString(),
+        PrType = evt.PullRequest?.Type.ToString()
     };
 
     /// <summary>
@@ -65,48 +65,62 @@ internal sealed record TraceEventDto
 
         var sha = CommitSha != null ? TryCreate(() => Model.CommitSha.Create(CommitSha)) : null;
         var branch = BranchName != null ? TryCreate(() => Model.BranchName.Create(BranchName)) : null;
-        var prNum = PullRequestNumber.HasValue ? TryCreate(() => Model.PullRequestNumber.Create(PullRequestNumber.Value)) : (PullRequestNumber?)null;
-
-        // Candidate factories for different event types
-        var candidates = new Func<TraceEvent?>[]
+        var prNum = PullRequestNumber.HasValue
+            ? TryCreate(() => Model.PullRequestNumber.Create(PullRequestNumber.Value))
+            : (PullRequestNumber?)null;
+        
+        var evt = (sha, branch, FilePath, CommitType, BranchType) switch
         {
-            // Merge
-            () => (sha != null && BranchType == "Merge") 
-                ? TraceEventFactory.Merge(timestamp, actor, sha, branch, Metadata) 
-                : null,
-
-            // File change
-            () => (sha != null && FilePath != null && CommitType != null) 
-                ? (TryCreate(() => Model.FilePath.Create(FilePath)) is var path && path != null &&
-                   TryParseEnum<CommitEventType>(CommitType) is var changeType && changeType != null
-                    ? TraceEventFactory.FileChange(timestamp, actor, path, changeType.Value, sha, Metadata)
-                    : null)
-                : null,
-
-            // Regular commit
-            () => (sha != null) ? TraceEventFactory.Commit(timestamp, actor, sha, Metadata) : null,
-
-            // Branch
-            () => (branch != null && BranchType != null && TryParseEnum<BranchEventType>(BranchType) is var branchType && branchType != null)
-                ? TraceEventFactory.Branch(timestamp, actor, branch, branchType.Value, sha, Metadata)
-                : null
+            (not null, not null, _, _, "Merge")
+                => TraceEventFactory.Merge(timestamp, actor, sha, branch, Metadata),
+            (not null, _, not null, not null, _)
+                => CreateFileChange(timestamp, actor, sha),
+            (_, not null, _, _, not null)
+                => CreateBranch(timestamp, actor, branch, sha),
+            (not null, _, _, _, _) => TraceEventFactory.Commit(timestamp, actor, sha, Metadata),
+            _ => null
         };
-
-        var evt = candidates.Select(f => f()).FirstOrDefault(e => e != null);
-
-        // Enrich with PR data if present
+        
         if (evt != null && prNum != null && PrType != null && TryParseEnum<PullRequestEventType>(PrType) is var prType && prType != null)
         {
-            evt.EnrichWithPullRequest(prNum.Value, prType.Value);
+            evt.Value.WithPullRequest(prNum.Value, prType.Value);
         }
-
+        
         return evt;
     }
 
-    // Helper: Try to parse enum from string
+    private TraceEvent? CreateFileChange(
+        Timestamp timestamp,
+        ActorName actor,
+        CommitSha sha)
+    {
+        var path = TryCreate(() => Model.FilePath.Create(FilePath));
+        var changeType = TryParseEnum<FileChangeKind>(CommitType);
+
+        return path != null && changeType != null
+            ? TraceEventFactory.FileChange(timestamp, actor, path, changeType.Value, sha, Metadata)
+            : null;
+    }
+    
+    private TraceEvent? CreateBranch(
+        Timestamp timestamp,
+        ActorName actor,
+        BranchName branch,
+        CommitSha? sha)
+    {
+        var branchType = TryParseEnum<BranchEventType>(BranchType);
+
+        return branchType != null
+            ? TraceEventFactory.Branch(timestamp, actor, branch, branchType.Value, sha, Metadata)
+            : null;
+    }
+    
     private static TEnum? TryParseEnum<TEnum>(string? value) where TEnum : struct =>
         value != null && Enum.TryParse<TEnum>(value, out var r) ? r : null;
-
-    // Helper: Try to create a Result<T> and return value or null
-    private static T? TryCreate<T>(Func<Result<T>> factory) => factory().IsSuccess ? factory().Value : default;
+    
+    private static T? TryCreate<T>(Func<Result<T>> factory)
+    {
+        var result = factory();
+        return result.IsSuccess ? result.Value : default;
+    }
 }

@@ -21,5 +21,5 @@ internal sealed class ByBranchSpec(BranchName branchName) : Specification<TraceE
     /// otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
-        => item.BranchName != null && item.BranchName == branchName;
+        => item.Branch.HasValue && item.Branch.Value.Name == branchName;
 }

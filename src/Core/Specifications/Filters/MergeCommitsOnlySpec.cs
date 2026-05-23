@@ -1,12 +1,10 @@
+using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
-using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Specifications.Filters;
 
 /// <summary>
 /// Filters events to include only merge commits.
-/// 
-/// Matches events where <see cref="TraceEvent.IsMergeCommit"/> returns true.
 /// </summary>
 internal sealed class MergeCommitsOnlySpec : Specification<TraceEvent>
 {
@@ -17,6 +15,6 @@ internal sealed class MergeCommitsOnlySpec : Specification<TraceEvent>
     /// <returns>
     /// <c>true</c> if the event is a merge commit; otherwise <c>false</c>.
     /// </returns>
-    internal override bool IsSatisfiedBy(TraceEvent item) 
-        => item.IsMergeCommit();
+    internal override bool IsSatisfiedBy(TraceEvent item)
+        => item.Branch is { Type: BranchEventType.Merge };
 }

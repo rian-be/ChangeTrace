@@ -26,7 +26,7 @@ internal sealed class ShowTimelineCommand : ICliCommand
     /// </summary>
     public Type HandlerType => typeof(ShowTimelineCommandHandler);
 
-    public Type Parent => null;
+    public Type? Parent => null;
     
     /// <summary>
     /// Builds the <see cref="Command"/> instance representing the 'show' CLI command.

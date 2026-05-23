@@ -1,11 +1,11 @@
-using ChangeTrace.Configuration;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
+using ChangeTrace.Core.Events.Info;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.GIt.Enrichers;
@@ -46,17 +46,53 @@ internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
     /// <param name="prNumber">Pull request number</param>
     /// <param name="prType">Pull request type (created, closed, merged)</param>
     /// <param name="metadata">Optional metadata string</param>
-    protected static void EnrichTraceEventWithPr(
-        TraceEvent traceEvent, 
-        int prNumber, 
-        PullRequestEventType prType, 
+    protected TraceEvent EnrichTraceEventWithPr(
+        in TraceEvent traceEvent,
+        int prNumber,
+        PullRequestEventType prType,
         string metadata)
     {
-        traceEvent.EnrichWithPullRequest(
-            PullRequestNumber.Create(prNumber).Value,
-            prType,
-            metadata
-        );
+        Logger.LogDebug(
+            "PR Enrichment start | Target: {Target} | Time: {Time}",
+            traceEvent.Target,
+            traceEvent.TimeForPlayback);
+
+        System.Diagnostics.Debug.WriteLine(
+            $"[PR ENRICH START] Target={traceEvent.Target}");
+
+        var pr = PullRequestNumber.Create(prNumber).Value;
+
+        var withPr = traceEvent.WithPullRequest(pr, prType);
+
+        Logger.LogDebug(
+            "PR attached | PR: {PrNumber} | Type: {Type}",
+            prNumber,
+            prType);
+
+        System.Diagnostics.Debug.WriteLine(
+            $"[PR ATTACHED] PR={prNumber} Type={prType}");
+
+        var newMetadata =
+            withPr.Metadata?.WithMetadata(metadata)
+            ?? new MetadataInfo(metadata);
+
+        var result = withPr.WithMetadata(newMetadata);
+
+        Logger.LogDebug(
+            "Metadata attached | Metadata: {Metadata}",
+            metadata);
+
+        System.Diagnostics.Debug.WriteLine(
+            $"[METADATA ATTACHED] {metadata}");
+
+        Logger.LogDebug(
+            "PR Enrichment finished | Target: {Target}",
+            result.Target);
+
+        System.Diagnostics.Debug.WriteLine(
+            $"[PR ENRICH END] Target={result.Target}");
+
+        return result;
     }
 
     /// <summary>

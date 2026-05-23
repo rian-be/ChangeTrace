@@ -1,5 +1,6 @@
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Specifications;
+using ChangeTrace.Core.Timelines;
 
 namespace ChangeTrace.Core.Extensions;
 

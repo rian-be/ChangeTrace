@@ -1,5 +1,4 @@
 using ChangeTrace.Core.Events;
-using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Specifications.Filters;
 
@@ -24,5 +23,6 @@ internal sealed class InDirectorySpec(string directory) : Specification<TraceEve
     /// <c>true</c> if the event's file path is inside the directory; otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item)
-        => item.FilePath != null && item.FilePath.IsInDirectory(_directory);
+        => item.Metadata?.FilePath != null &&
+           item.Metadata.Value.FilePath.IsInDirectory(_directory);
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -8,24 +8,50 @@
         
         <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
         <SelfContained>false</SelfContained> 
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks> 
+        
+        <!-- Fix Git metadata errors -->
+        <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+        <PublishRepositoryUrl>false</PublishRepositoryUrl>
+        
+        <!-- Exclude tools folder -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);tools/**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="src\Core\Enums\" />
-      <Folder Include="src\GIt\Extensions\" />
+      <Folder Include=".github\workflows\" />
+      <Folder Include="bin\Debug\net10.0\" />
+      <Folder Include="Docs\Adr\" />
+      <Folder Include="publish\" />
+      <Folder Include="src\Core\Specifications\Filters\Merge\" />
+      <Folder Include="src\Graphics\Rendering\Meshes\" />
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
       <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
       <PackageReference Include="MessagePack" Version="3.1.4" />
       <PackageReference Include="MessagePack.Annotations" Version="3.1.4" />
       <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
       <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
       <PackageReference Include="Octokit" Version="14.0.0" />
+      <PackageReference Include="OpenTK" Version="4.9.4" />
       <PackageReference Include="Scrutor" Version="7.0.0" />
+      <PackageReference Include="StbImageSharp" Version="2.30.15" />
       <PackageReference Include="System.CommandLine" Version="3.0.0-preview.1.26104.118" />
+      <PackageReference Include="Microsoft.Extensions.Diagnostics" Version="10.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
       <PackageReference Include="Spectre.Console" Version="0.54.0" />
       <PackageReference Include="Ulid" Version="1.4.1" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="Assets/**/*" Exclude="Assets/**/*.cs">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+
+        <Compile Remove="Assets/**/*.cs" />
+        <Compile Remove="bin/**/*.cs" />
+        <Compile Remove="obj/**/*.cs" />
+    </ItemGroup>
 </Project>

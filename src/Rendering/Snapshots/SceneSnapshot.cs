@@ -1,23 +1,20 @@
+using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.Snapshots;
 
 /// <summary>
-/// Represents snapshot of scene at specific moment in virtual time.
+/// Immutable snapshot of the current render scene state.
 /// </summary>
-/// <remarks>
-/// Holds immutable lists of nodes, avatars, edges, and particles.
-/// Provides helper methods for filtering, spatial queries, and basic statistics.
-/// </remarks>
+[AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class SceneSnapshot : ISceneSnapshot
 {
-    private readonly IReadOnlyList<NodeSnapshot> _nodes;
-    private readonly IReadOnlyList<AvatarSnapshot> _avatars;
-    private readonly IReadOnlyList<EdgeSnapshot> _edges;
-    private readonly IReadOnlyList<ParticleSnapshot> _particles;
-
-    private Dictionary<string, NodeSnapshot>? _nodeIndex;
+    /// <summary>
+    /// Fast node lookup index.
+    /// </summary>
+    private readonly Dictionary<string, NodeSnapshot> _nodeIndex;
 
     internal SceneSnapshot(
         IReadOnlyList<NodeSnapshot> nodes,
@@ -25,183 +22,243 @@ internal sealed class SceneSnapshot : ISceneSnapshot
         IReadOnlyList<EdgeSnapshot> edges,
         IReadOnlyList<ParticleSnapshot> particles)
     {
-        _nodes = nodes;
-        _avatars = avatars;
-        _edges = edges;
-        _particles = particles;
+        _nodeIndex =
+            new Dictionary<string, NodeSnapshot>(
+                nodes.Count);
+
+        foreach (NodeSnapshot node in nodes)
+            _nodeIndex[node.Id] = node;
+
+        Nodes =
+            _nodeIndex.Values
+                .OrderBy(n => n.Kind switch
+                {
+                    NodeKind.Root => 0,
+                    NodeKind.Branch => 1,
+                    NodeKind.File => 2,
+                    _ => 1
+                })
+                .ThenBy(n => n.Id)
+                .ToArray();
+
+        Avatars =
+            avatars;
+
+        Edges =
+            edges
+                .Where(e =>
+                    !string.IsNullOrWhiteSpace(e.ToId) &&
+                    !string.IsNullOrWhiteSpace(e.FromId) &&
+                    _nodeIndex.ContainsKey(e.FromId) &&
+                    _nodeIndex.ContainsKey(e.ToId))
+                .DistinctBy(e =>
+                    (e.FromId, e.ToId, e.Kind))
+                .ToArray();
+
+        Particles =
+            particles;
     }
 
     /// <summary>
-    /// An empty scene snapshot with no nodes, avatars, edges, or particles.
+    /// Empty reusable scene snapshot.
     /// </summary>
-    internal static SceneSnapshot Empty { get; } = new([], [], [], []);
-
-    public IReadOnlyList<NodeSnapshot> Nodes => _nodes;
-    public IReadOnlyList<AvatarSnapshot> Avatars => _avatars;
-    public IReadOnlyList<EdgeSnapshot> Edges => _edges;
-    public IReadOnlyList<ParticleSnapshot> Particles => _particles;
-
-    public int NodeCount => _nodes.Count;
-    public int AvatarCount => _avatars.Count;
-    public int EdgeCount => _edges.Count;
-    public int ParticleCount => _particles.Count;
-    public int TotalObjects => NodeCount + AvatarCount + EdgeCount + ParticleCount;
-
-    public bool IsEmpty => TotalObjects == 0;
-    public bool HasParticles => _particles.Count > 0;
+    internal static SceneSnapshot Empty { get; } =
+        new([], [], [], []);
 
     /// <summary>
-    /// Finds node by its identifier.
+    /// Scene nodes.
     /// </summary>
-    /// <param name="id">The node's unique identifier.</param>
-    /// <returns>The <see cref="NodeSnapshot"/> if found; otherwise, null.</returns>
+    public IReadOnlyList<NodeSnapshot> Nodes { get; }
+
+    /// <summary>
+    /// Scene avatars.
+    /// </summary>
+    public IReadOnlyList<AvatarSnapshot> Avatars { get; }
+
+    /// <summary>
+    /// Scene edges.
+    /// </summary>
+    public IReadOnlyList<EdgeSnapshot> Edges { get; }
+
+    /// <summary>
+    /// Active particles.
+    /// </summary>
+    public IReadOnlyList<ParticleSnapshot> Particles { get; }
+
+    /// <summary>
+    /// Total node count.
+    /// </summary>
+    public int NodeCount =>
+        Nodes.Count;
+
+    /// <summary>
+    /// Total avatar count.
+    /// </summary>
+    public int AvatarCount =>
+        Avatars.Count;
+
+    /// <summary>
+    /// Total edge count.
+    /// </summary>
+    public int EdgeCount =>
+        Edges.Count;
+
+    /// <summary>
+    /// Total particle count.
+    /// </summary>
+    public int ParticleCount =>
+        Particles.Count;
+
+    /// <summary>
+    /// Total render object count.
+    /// </summary>
+    public int TotalObjects =>
+        NodeCount +
+        AvatarCount +
+        EdgeCount +
+        ParticleCount;
+
+    /// <summary>
+    /// Indicates whether a snapshot contains no objects.
+    /// </summary>
+    public bool IsEmpty =>
+        TotalObjects == 0;
+
+    /// <summary>
+    /// Indicates whether a snapshot contains particles.
+    /// </summary>
+    public bool HasParticles =>
+        Particles.Count > 0;
+
+    /// <summary>
+    /// Finds node by identifier.
+    /// </summary>
     public NodeSnapshot? FindNode(string id)
     {
-        _nodeIndex ??= _nodes.ToDictionary(n => n.Id);
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+
         return _nodeIndex.GetValueOrDefault(id);
     }
 
     /// <summary>
-    /// Returns nodes of given kind.
+    /// Returns nodes matching the specified kind.
     /// </summary>
-    /// <param name="kind">The kind of nodes to filter.</param>
-    /// <returns>An enumerable of <see cref="NodeSnapshot"/> objects.</returns>
-    public IEnumerable<NodeSnapshot> NodesOfKind(NodeKind kind)
-        => _nodes.Where(n => n.Kind == kind);
+    public IEnumerable<NodeSnapshot> NodesOfKind(NodeKind kind) =>
+        Nodes.Where(n => n.Kind == kind);
 
     /// <summary>
-    /// Returns nodes with glow above threshold.
+    /// Returns glowing nodes above a threshold.
     /// </summary>
-    /// <param name="threshold">Glow threshold.</param>
-    /// <returns>An enumerable of <see cref="NodeSnapshot"/> objects.</returns>
-    public IEnumerable<NodeSnapshot> GlowingNodes(float threshold = 0.05f)
-        => _nodes.Where(n => n.Glow > threshold);
+    public IEnumerable<NodeSnapshot> GlowingNodes(
+        float threshold = 0.05f) =>
+        Nodes.Where(n => n.Glow > threshold);
 
     /// <summary>
-    /// Returns avatars with activity above threshold.
+    /// Returns active avatars above an activity threshold.
     /// </summary>
-    /// <param name="activityThreshold">Activity threshold.</param>
-    /// <returns>An enumerable of <see cref="AvatarSnapshot"/> objects.</returns>
-    public IEnumerable<AvatarSnapshot> ActiveAvatars(float activityThreshold = 0.1f)
-        => _avatars.Where(a => a.ActivityLevel > activityThreshold);
+    public IEnumerable<AvatarSnapshot> ActiveAvatars(
+        float activityThreshold = 0.1f) =>
+        Avatars.Where(a => a.ActivityLevel > activityThreshold);
 
     /// <summary>
-    /// Returns avatars with alpha above threshold.
+    /// Returns visible avatars above an alpha threshold.
     /// </summary>
-    /// <param name="alphaThreshold">Alpha threshold.</param>
-    /// <returns>An enumerable of <see cref="AvatarSnapshot"/> objects.</returns>
-    public IEnumerable<AvatarSnapshot> VisibleAvatars(float alphaThreshold = 0.05f)
-        => _avatars.Where(a => a.Alpha > alphaThreshold);
+    public IEnumerable<AvatarSnapshot> VisibleAvatars(
+        float alphaThreshold = 0.05f) =>
+        Avatars.Where(a =>
+            a.Alpha * a.ActivityLevel > alphaThreshold);
 
     /// <summary>
-    /// Finds an avatar by actor name.
+    /// Finds avatar by actor identifier.
     /// </summary>
-    /// <param name="actor">The actor's name.</param>
-    /// <returns>The <see cref="AvatarSnapshot"/> if found; otherwise, null.</returns>
-    public AvatarSnapshot? FindAvatar(string actor)
-        => _avatars.FirstOrDefault(a => a.Actor == actor);
+    public AvatarSnapshot? FindAvatar(string actor) =>
+        Avatars.FirstOrDefault(a => a.Actor == actor);
 
     /// <summary>
-    /// Returns edges starting from given node.
+    /// Returns outgoing edges for node.
     /// </summary>
-    /// <param name="nodeId">The source node identifier.</param>
-    /// <returns>An enumerable of <see cref="EdgeSnapshot"/> objects.</returns>
-    public IEnumerable<EdgeSnapshot> EdgesFrom(string nodeId)
-        => _edges.Where(e => e.FromId == nodeId);
+    public IEnumerable<EdgeSnapshot> EdgesFrom(string nodeId) =>
+        Edges.Where(e => e.FromId == nodeId);
 
     /// <summary>
-    /// Returns edges ending at given node.
+    /// Returns incoming edges for node.
     /// </summary>
-    /// <param name="nodeId">The target node identifier.</param>
-    /// <returns>An enumerable of <see cref="EdgeSnapshot"/> objects.</returns>
-    public IEnumerable<EdgeSnapshot> EdgesTo(string nodeId)
-        => _edges.Where(e => e.ToId == nodeId);
+    public IEnumerable<EdgeSnapshot> EdgesTo(string nodeId) =>
+        Edges.Where(e => e.ToId == nodeId);
 
     /// <summary>
-    /// Returns edges of specified kind.
+    /// Returns edges matching a specified kind.
     /// </summary>
-    /// <param name="kind">The kind of edge.</param>
-    /// <returns>An enumerable of <see cref="EdgeSnapshot"/> objects.</returns>
-    public IEnumerable<EdgeSnapshot> EdgesOfKind(EdgeKind kind)
-        => _edges.Where(e => e.Kind == kind);
+    public IEnumerable<EdgeSnapshot> EdgesOfKind(EdgeKind kind) =>
+        Edges.Where(e => e.Kind == kind);
 
     /// <summary>
-    /// Returns edges with alpha above threshold.
+    /// Returns visible edges above an alpha threshold.
     /// </summary>
-    /// <param name="alphaThreshold">Alpha threshold.</param>
-    /// <returns>An enumerable of <see cref="EdgeSnapshot"/> objects.</returns>
-    public IEnumerable<EdgeSnapshot> VisibleEdges(float alphaThreshold = 0.02f)
-        => _edges.Where(e => e.Alpha > alphaThreshold);
+    public IEnumerable<EdgeSnapshot> VisibleEdges(
+        float alphaThreshold = 0.02f) =>
+        Edges.Where(e => e.Alpha > alphaThreshold);
 
     /// <summary>
-    /// Calculates axis aligned bounding box of all nodes, or null if there are no nodes.
+    /// Computes average node center position.
     /// </summary>
-    /// <returns>A <see cref="Bounds"/> object or null.</returns>
-    public Bounds? NodeBounds()
-    {
-        if (_nodes.Count == 0) return null;
-
-        float minX = float.MaxValue, maxX = float.MinValue;
-        float minY = float.MaxValue, maxY = float.MinValue;
-
-        foreach (var n in _nodes)
-        {
-            minX = MathF.Min(minX, n.Position.X);
-            maxX = MathF.Max(maxX, n.Position.X);
-            minY = MathF.Min(minY, n.Position.Y);
-            maxY = MathF.Max(maxY, n.Position.Y);
-        }
-
-        return new Bounds(new Vec2(minX, minY), new Vec2(maxX, maxY));
-    }
-
-    /// <summary>
-    ///  Geometric center of all nodes, or null if none exist.
-    /// </summary>
-    /// <returns>The center position as <see cref="Vec2"/>; or null.</returns>
     public Vec2? NodesCenter()
     {
-        if (_nodes.Count == 0) return null;
-        var sum = Vec2.Zero;
-        foreach (var n in _nodes) sum += n.Position;
-        return sum / _nodes.Count;
+        if (Nodes.Count == 0)
+            return null;
+
+        Vec2 sum =
+            Vec2.Zero;
+
+        foreach (NodeSnapshot node in Nodes)
+            sum += node.Position;
+
+        return sum / Nodes.Count;
     }
 
     /// <summary>
-    /// Finds node closest to given point.
+    /// Finds the closest node to the specified point.
     /// </summary>
-    /// <param name="point">The reference point in world coordinates.</param>
-    /// <returns>The closest <see cref="NodeSnapshot"/>; or null if no nodes exist.</returns>
     public NodeSnapshot? ClosestNode(Vec2 point)
     {
-        if (_nodes.Count == 0) return null;
-        NodeSnapshot? best = null;
-        float bestDist = float.MaxValue;
+        if (Nodes.Count == 0)
+            return null;
 
-        foreach (var n in _nodes)
+        NodeSnapshot? best =
+            null;
+
+        float bestDist =
+            float.MaxValue;
+
+        foreach (NodeSnapshot node in Nodes)
         {
-            float dist = (n.Position - point).LengthSq;
-            if (dist < bestDist)
-            {
-                bestDist = dist;
-                best = n;
-            }
+            float dist =
+                (node.Position - point).LengthSq;
+
+            if (!(dist < bestDist))
+                continue;
+
+            bestDist = dist;
+            best = node;
         }
 
         return best;
     }
 
     /// <summary>
-    /// Returns basic statistics about scene.
+    /// Computes aggregate scene statistics.
     /// </summary>
-    /// <returns>A <see cref="SceneStats"/> object.</returns>
-    public SceneStats ComputeStats() => new(
-        NodeCount: NodeCount,
-        AvatarCount: AvatarCount,
-        EdgeCount: EdgeCount,
-        ParticleCount: ParticleCount,
-        ActiveAvatars: _avatars.Count(a => a.ActivityLevel > 0.1f),
-        GlowingNodes: _nodes.Count(n => n.Glow > 0.05f),
-        VisibleEdges: _edges.Count(e => e.Alpha > 0.02f)
-    );
+    public SceneStats ComputeStats() =>
+        new(
+            NodeCount: NodeCount,
+            AvatarCount: AvatarCount,
+            EdgeCount: EdgeCount,
+            ParticleCount: ParticleCount,
+            ActiveAvatars:
+                Avatars.Count(a => a.ActivityLevel > 0.1f),
+            GlowingNodes:
+                Nodes.Count(n => n.Glow > 0.05f),
+            VisibleEdges:
+                Edges.Count(e => e.Alpha > 0.02f));
 }

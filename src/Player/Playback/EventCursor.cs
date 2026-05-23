@@ -24,6 +24,15 @@ internal sealed class EventCursor : IEventCursor
     /// <summary>Current cursor index in the event list.</summary>
     public int Index { get; private set; }
 
+    /// <summary>Event at current cursor position (clamped to bounds), or null if empty.</summary>
+    public TraceEvent? CurrentEvent => _events.Count > 0 ? _events[Math.Clamp(Index, 0, _events.Count - 1)] : null;
+
+    /// <summary>First event in the timeline, or null if empty.</summary>
+    public TraceEvent? FirstEvent => _events.Count > 0 ? _events[0] : null;
+    
+    /// <summary>Last event in the timeline, or null if empty.</summary>
+    public TraceEvent? LastEvent => _events.Count > 0 ? _events[^1] : null;
+
     /// <summary>True if cursor is at the end of events.</summary>
     public bool AtEnd => Index >= _events.Count;
 

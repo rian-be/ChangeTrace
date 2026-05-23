@@ -3,6 +3,7 @@ using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Delegates;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
@@ -53,7 +54,8 @@ internal sealed class RepositoryExporter(
 
             var repoPath = pathResult.Value;
             progress?.Invoke("Prepare", 1, 4, "Repository ready");
-
+            
+            var repositoryId = ExtractRepositoryId(pathOrUrl);
             // Step 2: Read commits
             var commitsResult = await ReadCommitsStep(repoPath, options, progress, cancellationToken);
             if (commitsResult.IsFailure)
@@ -62,7 +64,7 @@ internal sealed class RepositoryExporter(
             var commits = commitsResult.Value;
             
             // Step 3: Build timeline
-            var timelineResult = BuildTimelineStep(commits, options, progress);
+            var timelineResult = BuildTimelineStep(commits, repositoryId, options, progress);
             if (timelineResult.IsFailure)
                 return Result<Timeline>.Failure(timelineResult.Error!);
             
@@ -70,12 +72,10 @@ internal sealed class RepositoryExporter(
             progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
 
             // Step 4 and 5 Enrich with PR data & Normalize
-            await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
-            timeline.Normalize(); 
+            //await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
+            TimelineNormalizer.Normalize(timeline); 
             
             progress?.Invoke("Complete", 4, 4, "Export complete");
-            var stats = timeline.GetStatistics();
-            logger.LogInformation("Export complete: {Stats}", stats);
 
             return Result<Timeline>.Success(timeline);
         }
@@ -168,7 +168,7 @@ internal sealed class RepositoryExporter(
         CancellationToken ct)
     {
         progress?.Invoke("Read", 1, 4, "Reading commits...");
-
+        
         var commitsResult = await gitReader.ReadCommitsAsync(
             repoPath,
             new GitReaderOptions(
@@ -187,11 +187,12 @@ internal sealed class RepositoryExporter(
 
         return Result<IReadOnlyList<CommitData>>.Success(commits);
     }
-    
+
     /// <summary>
     /// Builds timeline from list of commits using <see cref="ITimelineBuilder"/>.
     /// </summary>
     /// <param name="commits">List of commits to build timeline from.</param>
+    /// <param name="repositoryId"></param>
     /// <param name="options">Export options influencing timeline construction.</param>
     /// <param name="progress">Optional progress callback.</param>
     /// <returns>
@@ -199,20 +200,19 @@ internal sealed class RepositoryExporter(
     /// </returns>
     private Result<Timeline> BuildTimelineStep(
         IReadOnlyList<CommitData> commits, 
+        RepositoryId repositoryId,
         ExportOptions options,
         ProgressCallback? progress)
     {
         progress?.Invoke("Build", 2, 4, "Building timeline...");
-        var repositoryId = ExtractRepositoryId(options.TimelineName ?? string.Empty);
 
         var builderOptions = new TimelineBuilderOptions(
             IncludeFileChanges: options.IncludeFileChanges,
             IncludeBranchEvents: options.IncludeBranchEvents,
             IncludeMergeDetection: options.IncludeMergeDetection,
-            Name: options.TimelineName,
             RepositoryId: repositoryId
         );
-
+  
         return timelineBuilder.Build(commits, builderOptions);
     }
     

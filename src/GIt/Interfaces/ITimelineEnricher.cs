@@ -1,6 +1,7 @@
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Enrichers;
 
 namespace ChangeTrace.GIt.Interfaces;

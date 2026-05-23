@@ -18,6 +18,15 @@ internal interface IEventCursor
     /// <summary>Current cursor index in event list.</summary>
     int Index { get; }
 
+    /// <summary>Event at current cursor position, or null if out of bounds.</summary>
+    TraceEvent? CurrentEvent { get; }
+
+    /// <summary>First event in the timeline, or null if empty.</summary>
+    TraceEvent? FirstEvent { get; }
+    
+    /// <summary>Last event in the timeline, or null if empty.</summary>
+    TraceEvent? LastEvent { get; }
+
     /// <summary>Total number of events available.</summary>
     int TotalEvents { get; }
 

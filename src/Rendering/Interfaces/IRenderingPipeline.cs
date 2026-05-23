@@ -1,29 +1,45 @@
 using ChangeTrace.Player.Interfaces;
+using ChangeTrace.Rendering.Enums;
 
 namespace ChangeTrace.Rendering.Interfaces;
 
 /// <summary>
-/// Defines rendering pipeline that drives scene updates from timeline player.
+/// Drives scene rendering from a timeline player.
 /// </summary>
-/// <remarks>
-/// Implementations are responsible for connecting an <see cref="ITimelinePlayer"/> to
-/// rendering system, managing scene state updates, and coordinating outputs.
-/// The pipeline can be started and stopped to control flow of event processing.
-/// </remarks>
 internal interface IRenderingPipeline : IDisposable
 {
     /// <summary>
-    /// Gets timeline player that drives this pipeline.
+    /// Timeline player driving the pipeline.
     /// </summary>
     ITimelinePlayer Player { get; }
 
     /// <summary>
-    /// Starts pipeline, beginning event processing and scene updates.
+    /// Starts event processing and rendering updates.
     /// </summary>
     void Start();
 
     /// <summary>
-    /// Stops pipeline, halting event processing and scene updates.
+    /// Stops event processing and rendering updates.
     /// </summary>
     void Stop();
+
+    /// <summary>
+    /// Applies camera panning offset.
+    /// </summary>
+    void PanCamera(Vec2 delta);
+
+    /// <summary>
+    /// Applies camera zoom delta.
+    /// </summary>
+    void ZoomCamera(float deltaZoom);
+
+    /// <summary>
+    /// Sets active camera follow mode.
+    /// </summary>
+    void SetCameraMode(CameraFollowMode mode);
+
+    /// <summary>
+    /// Updates current mouse screen position.
+    /// </summary>
+    void UpdateMouse(Vec2 screenPos);
 }

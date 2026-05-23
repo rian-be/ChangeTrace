@@ -1,10 +1,10 @@
-using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -37,34 +37,26 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
         {
             logger.LogInformation("Building timeline from {Count} commits", commits.Count);
 
-            var timeline = new Timeline(options.Name, options.RepositoryId);
+            var timeline = new Timeline(options.RepositoryId);
             var branchTracker = new BranchTracker();
 
             foreach (var commit in commits)
             {
-                // 1. Main commit event
                 AddCommitEvent(timeline, commit);
-
-                // 2. File changes
                 if (options.IncludeFileChanges)
                 {
                     AddFileChangeEvents(timeline, commit);
                 }
-
-                // 3. Branch events
                 if (options.IncludeBranchEvents)
                 {
                     AddBranchEvents(timeline, commit, branchTracker);
                 }
-
-                // 4. Merge detection
                 if (options.IncludeMergeDetection && commit.IsMerge)
                 {
                     AddMergeEvent(timeline, commit);
                 }
             }
-
-            logger.LogInformation("Timeline built: {Stats}", timeline.GetStatistics());
+            
             return Result<Timeline>.Success(timeline);
         }
         catch (Exception ex)
@@ -73,10 +65,7 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
             return Result<Timeline>.Failure("Failed to build timeline", ex);
         }
     }
-
-    /// <summary>
-    /// Adds main commit event to the timeline.
-    /// </summary>
+    
     private static void AddCommitEvent(Timeline timeline, CommitData commit)
     {
         var evt = TraceEventFactory.Commit(
@@ -88,22 +77,16 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
 
         timeline.AddEvent(evt);
     }
-
-    /// <summary>
-    /// Adds individual file change events for each modified file in the commit.
-    /// Called only when IncludeFileChanges is true.
-    /// </summary>
+    
     private static void AddFileChangeEvents(Timeline timeline, CommitData commit)
     {
         foreach (var change in commit.FileChanges)
         {
-            var changeType = MapChangeKind(change.Kind);
-
             var evt = TraceEventFactory.FileChange(
                 timestamp: commit.Timestamp,
                 actor: commit.Author,
                 path: change.Path,
-                type: changeType,
+                type: change.Kind,  
                 sha: commit.Sha,
                 metadata: change.OldPath?.Value
             );
@@ -112,11 +95,6 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
         }
     }
     
-    /// <summary>
-    /// Adds branch related events (creation, updates, deletion) to the timeline.
-    /// Uses branch tracker to detect state changes across commits.
-    /// Called only when IncludeBranchEvents is true.
-    /// </summary>
     private static void AddBranchEvents(
         Timeline timeline,
         CommitData commit,
@@ -126,33 +104,33 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
 
         foreach (var branch in commit.Branches)
         {
-            if (tracker.IsNew(branch.Value))
-            {
-                var evt = TraceEventFactory.Branch(
-                    timestamp: commit.Timestamp,
-                    actor: commit.Author,
-                    branch: branch,
-                    type: BranchEventType.BranchCreated,
-                    sha: commit.Sha,
-                    metadata: $"Created at {commit.Sha.Short}"
-                );
+            bool isNew = tracker.TryUpdate(branch.Value, commit.Sha, commit.Timestamp);
+            if (!isNew) continue;
+            
+            var evt = TraceEventFactory.Branch(
+                timestamp: commit.Timestamp,
+                actor: commit.Author,
+                branch: branch,
+                type: BranchEventType.BranchCreated,
+                sha: commit.Sha,
+                metadata: $"Created at {commit.Sha.Short}"
+            );
 
-                timeline.AddEvent(evt);
-            }
-
-            tracker.Update(branch.Value, commit.Sha, commit.Timestamp);
+            timeline.AddEvent(evt);
         }
 
-        var deleted = tracker.GetDeleted(currentBranches);
+        using var pooled = tracker.GetDeletedPooled(currentBranches);
+        var deleted = pooled.Span;
 
-        foreach (var (branchName, lastSha) in deleted)
+        foreach (var (branchName, lastSha, lastTimestamp) in deleted)
         {
             var branchNameResult = BranchName.Create(branchName);
             if (!branchNameResult.IsSuccess)
                 continue;
 
+
             var evt = TraceEventFactory.Branch(
-                timestamp: commit.Timestamp,
+                timestamp: lastTimestamp,
                 actor: commit.Author,
                 branch: branchNameResult.Value,
                 type: BranchEventType.BranchDeleted,
@@ -164,10 +142,6 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
         }
     }
     
-    /// <summary>
-    /// Adds merge commit event to the timeline.
-    /// Called only when IncludeMergeDetection is true and commit is a merge.
-    /// </summary>
     private static void AddMergeEvent(Timeline timeline, CommitData commit)
     {
         var parentShas = string.Join(", ", commit.ParentShas.Select(s => s.Short));
@@ -186,16 +160,4 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
 
         timeline.AddEvent(evt);
     }
-
-    /// <summary>
-    /// Maps a file change kind from Git to the corresponding commit event type.
-    /// </summary>
-    private static CommitEventType MapChangeKind(FileChangeKind kind) => kind switch
-    {
-        FileChangeKind.Added => CommitEventType.FileAdded,
-        FileChangeKind.Modified => CommitEventType.FileModified,
-        FileChangeKind.Deleted => CommitEventType.FileDeleted,
-        FileChangeKind.Renamed => CommitEventType.FileRenamed,
-        _ => CommitEventType.FileModified
-    };
 }

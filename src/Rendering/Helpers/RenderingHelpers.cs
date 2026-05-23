@@ -1,30 +1,43 @@
+using System.Numerics;
+
 namespace ChangeTrace.Rendering.Helpers;
 
 /// <summary>
-/// Utility methods for generating positions in the scene for rendering purposes.
+/// Utility helpers for generating scene positions and colors.
 /// </summary>
 internal static class RenderingHelpers
 {
-    private static readonly Random Rng = Random.Shared;
+    private static readonly Random Rng =
+        Random.Shared;
 
     /// <summary>
-    /// Generates random position near the origin (for spawning nodes randomly around center).
+    /// Generates a random position near the scene origin.
     /// </summary>
     public static Vec2 RandomNear()
     {
-        var angle = Rng.NextSingle() * MathF.PI * 2f;
-        var dist  = 50f + Rng.NextSingle() * 200f;
-        return new Vec2(MathF.Cos(angle) * dist, MathF.Sin(angle) * dist);
+        float angle =
+            Rng.NextSingle() * MathF.PI * 2f;
+
+        float dist =
+            5f + Rng.NextSingle() * 15f;
+
+        return new Vec2(
+            MathF.Cos(angle) * dist,
+            MathF.Sin(angle) * dist);
     }
 
     /// <summary>
-    /// Generates random position along edges of scene (offscreen).
+    /// Generates random position along scene bounds.
     /// </summary>
     public static Vec2 RandomEdge()
     {
-        var side = Rng.NextSingle() * 4f;
-        var t = Rng.NextSingle();
-        const float r = 700f;
+        float side =
+            Rng.NextSingle() * 4f;
+
+        float t =
+            Rng.NextSingle();
+
+        const float r = 200f;
 
         return (int)side switch
         {
@@ -33,5 +46,22 @@ internal static class RenderingHelpers
             2 => new Vec2(-r + t * 2 * r, -r),
             _ => new Vec2(-r + t * 2 * r,  r)
         };
+    }
+
+    /// <summary>
+    /// Converts packed RGB integer into a normalized color vector.
+    /// </summary>
+    public static Vector4 ColorFromUInt(uint rgb)
+    {
+        float r =
+            ((rgb >> 16) & 0xFF) / 255f;
+
+        float g =
+            ((rgb >> 8) & 0xFF) / 255f;
+
+        float b =
+            (rgb & 0xFF) / 255f;
+
+        return new Vector4(r, g, b, 1f);
     }
 }

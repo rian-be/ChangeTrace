@@ -14,7 +14,8 @@ namespace ChangeTrace.Cli.Handlers.Debug;
 internal sealed class RenderDebugCommandHandler(
     ITimelineSerializer serializer,
     ITimelinePlayerFactory playerFactory,
-    IRenderSystemFactory renderFactory): ICliHandler
+    IRenderSystemFactory renderFactory,
+    Core.Diagnostics.IDiagnosticsProvider diagnostics): ICliHandler
 {
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
@@ -23,6 +24,6 @@ internal sealed class RenderDebugCommandHandler(
         if (timeline == null)
             return;
         
-        await CompositionRoot.RunAsync(timeline, playerFactory, renderFactory);
+        await CompositionRoot.RunAsync(timeline, playerFactory, renderFactory, diagnostics);
     }
 }

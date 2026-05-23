@@ -1,5 +1,6 @@
 using ChangeTrace.Cli.Extensions;
 using ChangeTrace.Configuration;
+using ChangeTrace.Rendering.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -15,7 +16,6 @@ public static class Program
         services.AddHttpClient();
 
         var provider = services.BuildServiceProvider();
-      
         var root = CliComposer.Build(provider);
      //   CliComposer.Dump(root);
         

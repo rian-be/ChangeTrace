@@ -7,7 +7,7 @@ namespace ChangeTrace.Core.Models;
 /// 
 /// Ensures the number is positive and provides convenient string and integer conversions.
 /// </summary>
-internal readonly struct PullRequestNumber
+internal readonly record struct PullRequestNumber
 {
     internal int Value { get; }
     private PullRequestNumber(int value) => Value = value;

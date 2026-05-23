@@ -1,4 +1,5 @@
 using ChangeTrace.Core;
+using ChangeTrace.Core.Timelines;
 
 namespace ChangeTrace.Player.Factory;
 
@@ -14,15 +15,15 @@ internal static class TimelineDurationCalculator
     /// <param name="maxDuration">Ceiling duration in seconds.</param>
     public static double Calculate(
         Timeline timeline,
-        double secondsPerDay = 10.0,
-        double minDuration   = 30.0,
+        double secondsPerDay = 60.0,
+        double minDuration   = 60.0,
         double maxDuration   = 3600.0)
     {
         if (timeline.Count == 0) return minDuration;
 
         var activeDays = timeline.Events
             .Select(e => DateTimeOffset
-                .FromUnixTimeSeconds(e.Timestamp.UnixSeconds)
+                .FromUnixTimeSeconds(e.Core.Timestamp.UnixSeconds)
                 .Date)
             .Distinct()
             .Count();

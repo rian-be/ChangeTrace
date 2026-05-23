@@ -1,101 +1,105 @@
+using System.Numerics;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Scene;
+using ChangeTrace.Rendering.Scene.Relations;
 
 namespace ChangeTrace.Rendering.Interfaces;
 
 /// <summary>
-/// Defines mutable scene graph abstraction used by rendering layer.
+/// Mutable scene graph used by the rendering layer.
 /// </summary>
-/// <remarks>
-/// Scene graph maintains collections of <see cref="SceneNode"/>, 
-/// <see cref="SceneEdge"/>, and <see cref="ActorAvatar"/> objects.
-/// <para>
-/// Implementations are responsible for lifecycle management, lookup,
-/// and temporal updates (e.g. edge decay).
-/// </para>
-/// </remarks>
 internal interface ISceneGraph
 {
     /// <summary>
-    /// Gets all nodes indexed by their unique identifier.
+    /// Scene nodes indexed by identifier.
     /// </summary>
     IReadOnlyDictionary<string, SceneNode> Nodes { get; }
 
     /// <summary>
-    /// Gets all avatars indexed by <see cref="ActorName"/>.
+    /// Actor avatars indexed by actor name.
     /// </summary>
     IReadOnlyDictionary<ActorName, ActorAvatar> Avatars { get; }
 
     /// <summary>
-    /// Gets collection of active edges.
+    /// Active scene edges.
     /// </summary>
     IReadOnlyList<SceneEdge> Edges { get; }
 
     /// <summary>
-    /// Gets existing node or creates a new one if it does not exist.
+    /// Gets an existing node or creates a new one.
     /// </summary>
-    /// <param name="id">Unique node identifier.</param>
-    /// <param name="kind">Type of node.</param>
-    /// <param name="position">Initial position if node is created.</param>
-    /// <param name="color">Initial color if node is created.</param>
-    /// <returns>Existing or newly created <see cref="SceneNode"/>.</returns>
-    SceneNode GetOrAddNode(string id, NodeKind kind, Vec2 position, uint color = 0xAAAAAA);
+    SceneNode GetOrAddNode(
+        string id,
+        NodeKind kind,
+        Vec2 position,
+        Vector4? color = null);
 
     /// <summary>
     /// Finds node by identifier.
     /// </summary>
-    /// <param name="id">Node identifier.</param>
-    /// <returns>Matching <see cref="SceneNode"/> or <c>null</c> if not found.</returns>
     SceneNode? FindNode(string id);
 
     /// <summary>
     /// Removes node by identifier.
     /// </summary>
-    /// <param name="id">Node identifier.</param>
     void RemoveNode(string id);
 
     /// <summary>
-    /// Gets existing avatar or creates new one if missing.
+    /// Gets an existing avatar or creates a new one.
     /// </summary>
-    /// <param name="actor">Actor identifier.</param>
-    /// <param name="spawnPos">Initial spawn position if created.</param>
-    /// <param name="color">Avatar color.</param>
-    /// <returns>Existing or newly created <see cref="ActorAvatar"/>.</returns>
-    ActorAvatar GetOrAddAvatar(ActorName actor, Vec2 spawnPos, uint color);
+    ActorAvatar GetOrAddAvatar(
+        ActorName actor,
+        Vec2 spawnPos,
+        Vector4 color);
 
     /// <summary>
-    /// Finds avatar by actor.
+    /// Finds avatar by actor name.
     /// </summary>
-    /// <param name="actor">Actor identifier.</param>
-    /// <returns>Matching <see cref="ActorAvatar"/> or <c>null</c> if not found.</returns>
     ActorAvatar? FindAvatar(ActorName actor);
 
     /// <summary>
-    /// Adds new edge between two nodes.
+    /// Removes avatar by actor name.
     /// </summary>
-    /// <param name="fromId">Source node identifier.</param>
-    /// <param name="toId">Target node identifier.</param>
-    /// <param name="kind">Edge type.</param>
-    /// <param name="virtualTime">Virtual time of creation.</param>
-    void AddEdge(string fromId, string toId, EdgeKind kind, double virtualTime);
+    void RemoveAvatar(ActorName actor);
 
     /// <summary>
-    /// Updates edges based on current virtual time.
+    /// Removes all avatars.
     /// </summary>
-    /// <param name="virtualTime">Current virtual time.</param>
-    /// <param name="decayRate">Alpha decay rate per time unit.</param>
-    void TickEdges(double virtualTime, float decayRate);
+    void ClearAvatars();
 
     /// <summary>
-    /// Returns all nodes of specified <see cref="NodeKind"/>.
+    /// Adds edge between two nodes.
     /// </summary>
-    /// <param name="kind">Node type filter.</param>
-    /// <returns>Enumerable of matching nodes.</returns>
+    void AddEdge(
+        string fromId,
+        string toId,
+        EdgeKind kind,
+        double virtualTime);
+
+    /// <summary>
+    /// Adds bundled edge from one source to multiple targets.
+    /// </summary>
+    void AddBundledEdge(
+        string fromId,
+        IEnumerable<string> toIds,
+        EdgeKind kind,
+        double virtualTime);
+
+    /// <summary>
+    /// Updates edge decay and lifetime state.
+    /// </summary>
+    void TickEdges(
+        double virtualTime,
+        float decayRate);
+
+    /// <summary>
+    /// Returns nodes matching the specified kind.
+    /// </summary>
     IEnumerable<SceneNode> NodesOfKind(NodeKind kind);
 
     /// <summary>
-    /// Clears entire scene graph.
+    /// Clears the entire scene graph.
     /// </summary>
     void Clear();
 }

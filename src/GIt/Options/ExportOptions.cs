@@ -43,5 +43,4 @@ internal sealed record ExportOptions
     public int MaxCommits { get; init; } = 0;
     public DateTimeOffset? StartDate { get; init; }
     public DateTimeOffset? EndDate { get; init; }
-    public string? TimelineName { get; init; }
 }

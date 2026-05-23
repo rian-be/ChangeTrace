@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace ChangeTrace.Core.Results;
 
@@ -23,20 +24,29 @@ internal readonly struct Result
     }
 
     [MemberNotNullWhen(false, nameof(Error))]
-    public bool IsFailure => !IsSuccess;
+    public bool IsFailure
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => !IsSuccess;
+    }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result Success() => new(true, null, null);
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result Failure(string error) => new(false, error, null);
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Result Failure(string error, Exception exception) => new(false, error, exception);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result OnSuccess(Action action)
     {
         if (IsSuccess) action();
         return this;
     }
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result OnFailure(Action<string> action)
     {
         if (IsFailure) action(Error!);

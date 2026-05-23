@@ -1,5 +1,4 @@
 using ChangeTrace.Core.Events;
-using ChangeTrace.Core.Models;
 
 namespace ChangeTrace.Core.Specifications.Filters;
 
@@ -19,5 +18,5 @@ internal sealed class CommitsOnlySpec : Specification<TraceEvent>
     /// <c>true</c> when the event has a commit type; otherwise <c>false</c>.
     /// </returns>
     internal override bool IsSatisfiedBy(TraceEvent item) 
-        => item.CommitType.HasValue;
+        => item.Commit.HasValue;
 }

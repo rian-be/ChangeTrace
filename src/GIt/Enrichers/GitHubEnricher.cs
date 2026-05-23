@@ -1,9 +1,9 @@
-using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -76,7 +76,7 @@ internal sealed class GitHubEnricher : BasePlatformEnricher
                 var prType = MapPrState(pr.Merged, pr.State.StringValue);
                 var metadata = $"PR#{pr.Number} by {pr.User.Login} -> {pr.Base.Ref}";
 
-                EnrichTraceEventWithPr(targetEvent, prNumber, prType, metadata);
+                EnrichTraceEventWithPr(targetEvent.Value, prNumber, prType, metadata);
                 matched++;
             }
 
@@ -144,7 +144,7 @@ internal sealed class GitHubEnricher : BasePlatformEnricher
             var shaResult = CommitSha.Create(pr.MergeCommitSha);
             if (shaResult.IsSuccess)
             {
-                targetEvent = timeline.FindFirst(e => e.CommitSha != null && e.CommitSha.Matches(shaResult.Value));
+               targetEvent = timeline.FindFirst(e => e.Commit?.Sha != null && e.Commit.Value.Sha.Matches(shaResult.Value));
                 if (targetEvent != null)
                     Logger.LogDebug("PR #{Number} matched via merge SHA", pr.Number);
             }
@@ -156,7 +156,7 @@ internal sealed class GitHubEnricher : BasePlatformEnricher
             var shaResult = CommitSha.Create(pr.Head.Sha);
             if (shaResult.IsSuccess)
             {
-                targetEvent = timeline.FindFirst(e => e.CommitSha != null && e.CommitSha.Matches(shaResult.Value));
+                targetEvent = timeline.FindFirst(e => e.Commit?.Sha != null && e.Commit.Value.Sha.Matches(shaResult.Value));
                 if (targetEvent != null)
                     Logger.LogDebug("PR #{Number} matched via head SHA", pr.Number);
             }
@@ -168,7 +168,7 @@ internal sealed class GitHubEnricher : BasePlatformEnricher
             var branchResult = BranchName.Create(pr.Head.Ref);
             if (branchResult.IsSuccess)
             {
-                targetEvent = timeline.FindFirst(e => e.BranchName != null && e.BranchName == branchResult.Value);
+                targetEvent = timeline.FindFirst(e => e.Branch?.Name != null && e.Branch.Value.Name == branchResult.Value);
                 if (targetEvent != null)
                     Logger.LogDebug("PR #{Number} matched via branch", pr.Number);
             }

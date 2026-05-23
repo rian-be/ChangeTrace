@@ -1,3 +1,5 @@
+using ChangeTrace.Core.Enums;
+
 namespace ChangeTrace.Core.Models;
 
 /// <summary>

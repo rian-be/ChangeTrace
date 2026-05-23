@@ -1,43 +1,39 @@
 using ChangeTrace.Player;
+using ChangeTrace.Rendering.Hud;
+using ChangeTrace.Rendering.Scene;
 using ChangeTrace.Rendering.States;
 
 namespace ChangeTrace.Rendering.Interfaces;
 
 /// <summary>
-/// Defines contract for assembling immutable <see cref="RenderState"/> snapshots.
+/// Assembles immutable render state snapshots.
 /// </summary>
-/// <remarks>
-/// Implementations collect runtime data from scene, animation system,
-/// camera, and player diagnostics to produce a complete render frame state.
-/// </remarks>
 internal interface IRenderStateAssembler
 {
     /// <summary>
-    /// Records an event occurrence for specified actor.
+    /// Records actor activity event.
     /// </summary>
-    /// <param name="actor">Actor identifier.</param>
-    void RecordActorEvent(string actor);
+    void RecordActorEvent(
+        string actor,
+        string commitSha);
 
     /// <summary>
-    /// Assembles new immutable render state snapshot.
+    /// Builds render a state snapshot for the current frame.
     /// </summary>
-    /// <param name="virtualTime">Current virtual timeline time (seconds).</param>
-    /// <param name="wallDelta">Elapsed real (wall clock) time since last frame.</param>
-    /// <param name="scene">Current scene graph.</param>
-    /// <param name="anim">Active animation system.</param>
-    /// <param name="camera">Camera state.</param>
-    /// <param name="diagnostics">Current player diagnostics snapshot.</param>
-    /// <returns>Newly constructed <see cref="RenderState"/> instance.</returns>
     RenderState Assemble(
         double virtualTime,
         double wallDelta,
         ISceneGraph scene,
         IAnimationSystem anim,
         Camera.Camera camera,
-        PlayerDiagnostics diagnostics);
+        ICameraController cameraCtrl,
+        PlayerDiagnostics diagnostics,
+        SceneNode? hoveredNode,
+        HoveredPodHud? hoveredPod,
+        LayoutMode mode);
 
     /// <summary>
-    /// Clears internal actor counters and accumulated state.
+    /// Clears accumulated internal state.
     /// </summary>
     void Reset();
 }

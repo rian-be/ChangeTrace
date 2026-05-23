@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace ChangeTrace.Rendering.Snapshots;
 
 /// <summary>
@@ -5,11 +7,11 @@ namespace ChangeTrace.Rendering.Snapshots;
 /// </summary>
 /// <remarks>
 /// Captures particle position, alpha transparency, size, and color.
-/// Used to render particle systems consistently without mutating live simulation state.
+/// Used to render particle systems consistently without mutating the live simulation state.
 /// </remarks>
-internal sealed record ParticleSnapshot(
+internal readonly record struct ParticleSnapshot(
     Vec2 Position,
     float Alpha,
     float Size,
-    uint Color
+    Vector4 Color
 );

@@ -1,151 +1,216 @@
+// SceneGraph.cs
+using System.Numerics;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Interfaces;
+using ChangeTrace.Rendering.Scene.Graph;
+using ChangeTrace.Rendering.Scene.Relations;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.Scene;
 
 /// <summary>
-/// An in memory scene graph for visualization purposes.
+/// Thread-safe facade for scene nodes, avatars, and runtime edges.
 /// </summary>
-/// <remarks>
-/// Holds current state of scene, including nodes (<see cref="SceneNode"/>),
-/// avatars (<see cref="ActorAvatar"/>), and edges (<see cref="SceneEdge"/>).
-/// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class SceneGraph : ISceneGraph
 {
-    private readonly Dictionary<string, SceneNode> _nodes = new();
-    private readonly Dictionary<ActorName, ActorAvatar> _avatars = new();
-    private readonly List<SceneEdge> _edges = [];
+    private readonly Lock _lock = new();
 
-    private const float EdgeLifetimeSeconds = 4f;
+    private readonly SceneNodeRegistry _nodes = new();
+    private readonly SceneAvatarRegistry _avatars = new();
+    private readonly SceneEdgeManager _edges = new();
+    private readonly SceneHierarchyManager _hierarchy;
 
-    public IReadOnlyDictionary<string, SceneNode> Nodes => _nodes;
-    public IReadOnlyDictionary<ActorName, ActorAvatar> Avatars => _avatars;
-    public IReadOnlyList<SceneEdge> Edges => _edges;
-    
     /// <summary>
-    /// Gets existing node by identifier or creates a new one if it does not exist.
+    /// Creates scene graph facade.
     /// </summary>
-    /// <param name="id">Unique node identifier.</param>
-    /// <param name="kind">Logical node kind.</param>
-    /// <param name="position">Initial node position in scene space.</param>
-    /// <param name="color">Packed RGB color value.</param>
-    /// <returns>Existing or newly created <see cref="SceneNode"/>.</returns>
-    public SceneNode GetOrAddNode(string id, NodeKind kind, Vec2 position, uint color = 0xAAAAAA)
+    public SceneGraph()
     {
-        if (_nodes.TryGetValue(id, out var existing))
-            return existing;
+        _hierarchy = new SceneHierarchyManager(_nodes);
+    }
 
-        var node = new SceneNode(id, kind, position, color);
-        _nodes.Add(id, node);
-        return node;
+    /// <summary>
+    /// Registered scene nodes.
+    /// </summary>
+    public IReadOnlyDictionary<string, SceneNode> Nodes
+    {
+        get { lock (_lock) return _nodes.Items; }
+    }
+
+    /// <summary>
+    /// Registered actor avatars.
+    /// </summary>
+    public IReadOnlyDictionary<ActorName, ActorAvatar> Avatars
+    {
+        get { lock (_lock) return _avatars.Items; }
+    }
+
+    /// <summary>
+    /// Combined hierarchy and runtime scene edges.
+    /// </summary>
+    public IReadOnlyList<SceneEdge> Edges
+    {
+        get { lock (_lock) return _edges.GetEdges(_nodes.Items, _hierarchy); }
+    }
+
+    /// <summary>
+    /// Gets existing root node or creates it.
+    /// </summary>
+    public SceneNode GetOrCreateRoot()
+    {
+        lock (_lock)
+            return _nodes.GetOrCreateRoot();
+    }
+
+    /// <summary>
+    /// Gets existing node or creates a new one.
+    /// </summary>
+    public SceneNode GetOrAddNode(
+        string id,
+        NodeKind kind,
+        Vec2 position,
+        Vector4? color = null)
+    {
+        lock (_lock)
+        {
+            SceneNode node = _nodes.GetOrAddNode(
+                id,
+                kind,
+                position,
+                color,
+                out bool topologyChanged);
+
+            if (!topologyChanged)
+                return node;
+
+            _hierarchy.EnsureParentChain(node);
+            _hierarchy.MarkDirty();
+            _edges.MarkTopologyDirty();
+
+            return node;
+        }
     }
 
     /// <summary>
     /// Finds node by identifier.
     /// </summary>
-    /// <param name="id">Node identifier.</param>
-    /// <returns>
-    /// Matching <see cref="SceneNode"/> if found; otherwise <c>null</c>.
-    /// </returns>
     public SceneNode? FindNode(string id)
-        => _nodes.TryGetValue(id, out var node) ? node : null;
-
-    /// <summary>
-    /// Removes node with specified identifier.
-    /// </summary>
-    /// <param name="id">Node identifier.</param>
-    public void RemoveNode(string id)
-        => _nodes.Remove(id);
-
-    /// <summary>
-    /// Gets existing avatar for actor or creates a new one.
-    /// </summary>
-    /// <param name="actor">Actor identifier.</param>
-    /// <param name="spawnPos">Initial avatar position.</param>
-    /// <param name="color">Packed RGB color value.</param>
-    /// <returns>Existing or newly created <see cref="ActorAvatar"/>.</returns>
-    public ActorAvatar GetOrAddAvatar(ActorName actor, Vec2 spawnPos, uint color)
     {
-        if (_avatars.TryGetValue(actor, out var existing))
-            return existing;
+        lock (_lock)
+            return _nodes.Find(id);
+    }
 
-        var avatar = new ActorAvatar(actor, spawnPos, color);
-        _avatars.Add(actor, avatar);
-        return avatar;
+    /// <summary>
+    /// Removes node by identifier.
+    /// </summary>
+    public void RemoveNode(string id)
+    {
+        lock (_lock)
+        {
+            if (!_nodes.Remove(id))
+                return;
+
+            _hierarchy.MarkDirty();
+            _edges.MarkTopologyDirty();
+        }
+    }
+
+    /// <summary>
+    /// Gets existing avatar or creates a new one.
+    /// </summary>
+    public ActorAvatar GetOrAddAvatar(
+        ActorName actor,
+        Vec2 spawnPos,
+        Vector4 color)
+    {
+        lock (_lock)
+            return _avatars.GetOrAdd(actor, spawnPos, color);
     }
 
     /// <summary>
     /// Finds avatar by actor identifier.
     /// </summary>
-    /// <param name="actor">Actor identifier.</param>
-    /// <returns>
-    /// Matching <see cref="ActorAvatar"/> if found; otherwise <c>null</c>.
-    /// </returns>
     public ActorAvatar? FindAvatar(ActorName actor)
-        => _avatars.TryGetValue(actor, out var avatar) ? avatar : null;
-
-    /// <summary>
-    /// Adds a new edge between two nodes.
-    /// </summary>
-    /// <param name="fromId">Source node identifier.</param>
-    /// <param name="toId">Target node identifier.</param>
-    /// <param name="kind">Edge classification.</param>
-    /// <param name="virtualTime">Logical time of edge creation.</param>
-    public void AddEdge(string fromId, string toId, EdgeKind kind, double virtualTime)
-        => _edges.Add(new SceneEdge(fromId, toId, kind, virtualTime));
-
-    /// <summary>
-    /// Updates edge alpha values and removes expired edges.
-    /// </summary>
-    /// <param name="virtualTime">Current logical time.</param>
-    /// <param name="decayRate">Linear decay multiplier applied to normalized lifetime.</param>
-    /// <remarks>
-    /// Edge lifetime is normalized using internal constant duration
-    /// (<c>EdgeLifetimeSeconds</c>). Alpha fades linearly towards zero.
-    /// </remarks>
-    public void TickEdges(double virtualTime, float decayRate)
     {
-        for (var i = _edges.Count - 1; i >= 0; i--)
-        {
-            var edge = _edges[i];
-
-            var age = virtualTime - edge.CreatedAt;
-            var t = (float)(age / EdgeLifetimeSeconds);
-
-            edge.Alpha = Math.Clamp(1f - t * decayRate, 0f, 1f);
-
-            if (edge.Alpha == 0f)
-                _edges.RemoveAt(i);
-        }
+        lock (_lock)
+            return _avatars.Find(actor);
     }
 
     /// <summary>
-    /// Enumerates nodes of specified kind.
+    /// Removes avatar by actor identifier.
     /// </summary>
-    /// <param name="kind">Node kind to filter by.</param>
-    /// <returns>
-    /// Sequence of <see cref="SceneNode"/> instances matching specified kind.
-    /// </returns>
+    public void RemoveAvatar(ActorName actor)
+    {
+        lock (_lock)
+            _avatars.Remove(actor);
+    }
+
+    /// <summary>
+    /// Removes all avatars.
+    /// </summary>
+    public void ClearAvatars()
+    {
+        lock (_lock)
+            _avatars.Clear();
+    }
+
+    /// <summary>
+    /// Adds runtime edge between two existing nodes.
+    /// </summary>
+    public void AddEdge(
+        string fromId,
+        string toId,
+        EdgeKind kind,
+        double virtualTime)
+    {
+        lock (_lock)
+            _edges.AddEdge(_nodes.Items, fromId, toId, kind, virtualTime);
+    }
+
+    /// <summary>
+    /// Adds bundled runtime edge from one node to multiple targets.
+    /// </summary>
+    public void AddBundledEdge(
+        string fromId,
+        IEnumerable<string> toIds,
+        EdgeKind kind,
+        double virtualTime)
+    {
+        lock (_lock)
+            _edges.AddBundledEdge(_nodes.Items, fromId, toIds, kind, virtualTime);
+    }
+
+    /// <summary>
+    /// Updates runtime edge lifetimes.
+    /// </summary>
+    public void TickEdges(double dt, float decayRate)
+    {
+        lock (_lock)
+            _edges.Tick(dt, decayRate);
+    }
+
+    /// <summary>
+    /// Returns nodes matching the specified kind.
+    /// </summary>
     public IEnumerable<SceneNode> NodesOfKind(NodeKind kind)
     {
-        foreach (var node in _nodes.Values)
-        {
-            if (node.Kind == kind)
-                yield return node;
-        }
+        lock (_lock)
+            return _nodes.GetByKind(kind);
     }
 
     /// <summary>
-    /// Removes all nodes, avatars, and edges from scene graph.
+    /// Clears all scene state.
     /// </summary>
     public void Clear()
     {
-        _nodes.Clear();
-        _avatars.Clear();
-        _edges.Clear();
+        lock (_lock)
+        {
+            _nodes.Clear();
+            _avatars.Clear();
+            _edges.Clear();
+            _hierarchy.Clear();
+        }
     }
 }

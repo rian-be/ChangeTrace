@@ -4,7 +4,7 @@ using ChangeTrace.Core.Models;
 namespace ChangeTrace.Rendering.Scene;
 
 /// <summary>
-/// Represents visual avatar of an actor in scene.
+/// Represents visual avatar of an actor in scenes.
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
@@ -17,7 +17,7 @@ namespace ChangeTrace.Rendering.Scene;
 internal sealed class ActorAvatar
 {
     /// <summary>
-    /// Identifier of actor.
+    /// Identifier of actors.
     /// </summary>
     internal ActorName Actor { get; }
 
@@ -42,7 +42,7 @@ internal sealed class ActorAvatar
     internal float Alpha { get; set; } = 1f;
 
     /// <summary>
-    /// Virtual time of last event associated with this actor.
+    /// Virtual time of the last event associated with this actor.
     /// </summary>
     internal double LastSeen { get; set; }
 
@@ -52,10 +52,15 @@ internal sealed class ActorAvatar
     internal float ActivityLevel { get; set; }
 
     /// <summary>
+    /// Identifier of node actor is currently interacting with.
+    /// </summary>
+    internal string? TargetNodeId { get; set; }
+
+    /// <summary>
     /// Initializes new <see cref="ActorAvatar"/>.
     /// </summary>
     /// <param name="actor">Actor identifier.</param>
-    /// <param name="spawnPosition">Initial position in scene.</param>
+    /// <param name="spawnPosition">Initial position in scenes.</param>
     /// <param name="color">Deterministic color from palette.</param>
     internal ActorAvatar(ActorName actor, Vec2 spawnPosition, Vector4 color)
     {

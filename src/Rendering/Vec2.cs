@@ -16,7 +16,7 @@ internal readonly record struct Vec2(float X, float Y)
     internal float LengthSq => X * X + Y * Y;
 
     /// <summary>Euclidean length (magnitude) of the vector.</summary>
-    internal float Length => MathF.Sqrt(LengthSq);
+    private float Length => MathF.Sqrt(LengthSq);
 
     /// <summary>Returns a normalized (unit-length) vector in the same direction.
     /// Returns <see cref="Zero"/> if vector length is near zero.</summary>
@@ -32,7 +32,12 @@ internal readonly record struct Vec2(float X, float Y)
     /// <returns>Interpolated vector.</returns>
     internal Vec2 Lerp(Vec2 to, float t) =>
         new(X + (to.X - X) * t, Y + (to.Y - Y) * t);
-
+    
+    internal static Vec2 Lerp(Vec2 from, Vec2 to, float t) =>
+        new(
+            from.X + (to.X - from.X) * t,
+            from.Y + (to.Y - from.Y) * t);
+    
     /// <summary>Computes the dot product with another vector.</summary>
     /// <param name="other">Other vector.</param>
     /// <returns>Dot product (scalar).</returns>
@@ -44,6 +49,9 @@ internal readonly record struct Vec2(float X, float Y)
     /// <summary>Vector subtraction.</summary>
     public static Vec2 operator -(Vec2 a, Vec2 b) => new(a.X - b.X, a.Y - b.Y);
 
+    /// <summary>Unary negation (negate both components).</summary>
+    public static Vec2 operator -(Vec2 v) => new(-v.X, -v.Y);
+
     /// <summary>Scale vector by scalar.</summary>
     public static Vec2 operator *(Vec2 v, float s) => new(v.X * s, v.Y * s);
 
@@ -52,7 +60,6 @@ internal readonly record struct Vec2(float X, float Y)
 
     /// <summary>Divide vector by scalar.</summary>
     public static Vec2 operator /(Vec2 v, float s) => new(v.X / s, v.Y / s);
-
-    /// <summary>Returns a human-readable string representation of the vector.</summary>
+    
     public override string ToString() => $"({X:F1}, {Y:F1})";
 }

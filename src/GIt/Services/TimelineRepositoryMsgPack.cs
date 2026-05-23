@@ -1,8 +1,8 @@
-using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -49,11 +49,47 @@ internal sealed class TimelineRepositoryMsgPack(
         {
             filePath = fileManager.EnsureExtension(filePath, FileExtension);
             logger.LogInformation("Saving timeline to {Path}", filePath);
-
             var bytes = await serializer.SerializeAsync(timeline, cancellationToken);
             await fileManager.SaveAsync(filePath, bytes, cancellationToken);
 
-            logger.LogInformation("Timeline saved successfully ({Length} bytes)", bytes.Length);
+        logger.LogInformation("Timeline saved successfully ({Length} bytes)", bytes.Length);
+            
+            
+        var debugObject = new
+        {
+            Repository = timeline.RepositoryId != null
+                ? new
+                {
+                    timeline.RepositoryId.Owner,
+                    timeline.RepositoryId.Name
+                }
+                : null,
+            EventCount = timeline.Events.Count,
+            Events = timeline.Events.Select(evt => new
+            {
+                Timestamp = evt.Core.Timestamp.UnixSeconds,
+                Actor = evt.Core.Actor?.Value,
+                Branch = evt.Branch?.Name?.Value,
+                BranchType = evt.Branch?.Type,
+                CommitSha = evt.Commit?.Sha?.Value,
+                CommitType = evt.Commit?.Type,
+                FilePath = evt.Metadata?.FilePath?.Value,
+                MetadataMessage = evt.Metadata?.Metadata,
+                Target = evt.Target
+            }).ToList()
+        };
+            var json = System.Text.Json.JsonSerializer.Serialize(
+                debugObject,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+            var debugPath = filePath + ".debug.json";
+            await File.WriteAllTextAsync(debugPath, json, cancellationToken);
+
+            
+            
             return Result.Success();
         }
         catch (Exception ex)

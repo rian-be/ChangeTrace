@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace ChangeTrace.Core.Results;
 
@@ -27,7 +28,11 @@ internal readonly struct Result<T>
 
     [MemberNotNullWhen(true, nameof(_value))]
     [MemberNotNullWhen(false, nameof(Error))]
-    public bool IsFailure => !IsSuccess;
+    public bool IsFailure
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => !IsSuccess;
+    }
 
     public T Value => IsSuccess ? _value : throw new InvalidOperationException(Error, Exception);
 
@@ -72,12 +77,14 @@ internal readonly struct Result<T>
     public async Task<Result<TNew>> BindAsync<TNew>(Func<T, Task<Result<TNew>>> binder)
         => IsFailure ? Result<TNew>.Failure(Error!, Exception) : await binder(_value);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> OnSuccess(Action<T> action)
     {
         if (IsSuccess) action(_value);
         return this;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Result<T> OnFailure(Action<string> action)
     {
         if (IsFailure) action(Error!);
@@ -88,6 +95,7 @@ internal readonly struct Result<T>
     /// Matches over the result, executing <paramref name="onSuccess"/> if successful,
     /// or <paramref name="onFailure"/> if failed.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<string, TResult> onFailure)
         => IsSuccess ? onSuccess(_value) : onFailure(Error!);
 

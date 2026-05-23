@@ -9,7 +9,7 @@ namespace ChangeTrace.Core.Specifications.Filters;
 /// Matches events that have a defined <see cref="TraceEvent.PrType"/>.
 /// Non pull request events are excluded.
 /// </summary>
-internal sealed class PullRequestsOnlySpec : Specification<TraceEvent>
+internal sealed class PullRequestsOnlySpec //: Specification<TraceEvent>
 {
     /// <summary>
     /// Determines whether <see cref="TraceEvent"/> represents pull request event.
@@ -18,6 +18,5 @@ internal sealed class PullRequestsOnlySpec : Specification<TraceEvent>
     /// <returns>
     /// <c>true</c> when the event has a pull request type; otherwise <c>false</c>.
     /// </returns>
-    internal override bool IsSatisfiedBy(TraceEvent item) 
-        => item.PrType.HasValue;
+   // internal override bool IsSatisfiedBy(TraceEvent item) => item.PrType.HasValue;
 }

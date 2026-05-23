@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
+using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.GIt.Interfaces;

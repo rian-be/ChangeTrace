@@ -3,7 +3,7 @@ using ChangeTrace.Rendering.Enums;
 namespace ChangeTrace.Rendering.Commands;
 
 /// <summary>
-/// Command to spawn, pulse, or remove file node on graph.
+/// Command to spawn, pulse, or remove the file node on the graph.
 /// Renderer interprets <see cref="Action"/> to decide visual effect.
 /// </summary>
 /// <param name="Timestamp">Virtual time (seconds) when this command occurs.</param>
@@ -12,5 +12,7 @@ namespace ChangeTrace.Rendering.Commands;
 internal sealed record FileNodeCommand(
     double Timestamp,
     string FilePath,
-    FileNodeAction Action
+    FileNodeAction Action,
+    string? Author = null,
+    string? CommitSha = null
 ) : RenderCommand(Timestamp);

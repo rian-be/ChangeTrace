@@ -24,14 +24,22 @@ internal sealed record PlayerDiagnostics(
     int LoopCount,
     double WallElapsedSeconds,
     int TickCount,
-    double AvgEventsPerTick
+    double AvgEventsPerTick,
+    string? CurrentDateLabel = null,
+    int ElapsedDays = 0,
+    float ManagedMemoryMb = 0,
+    float UnmanagedMemoryMb = 0,
+    IReadOnlyList<int>? GcCollections = null,
+    double CpuUsage = 0,
+    int ThreadCount = 0,
+    double UpTime = 0
 )
 {
     /// <summary>
     /// Returns formatted diagnostic summary string.
     /// </summary>
     /// <returns>
-    /// Human-readable one line representation of current playback metrics.
+    /// Human-readable one-line representation of current playback metrics.
     /// </returns>
     public override string ToString() =>
         $"[{State}|{Mode}] {Direction} " +

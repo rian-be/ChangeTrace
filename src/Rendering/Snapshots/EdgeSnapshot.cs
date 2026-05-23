@@ -10,10 +10,12 @@ namespace ChangeTrace.Rendering.Snapshots;
 /// Captures source and target node IDs, edge type, current alpha transparency, 
 /// and deterministic color. Used to render edges in the visualization system.
 /// </remarks>
-internal sealed record EdgeSnapshot(
+internal readonly record struct EdgeSnapshot(
     string FromId,
     string ToId,
     EdgeKind Kind,
     float Alpha,
-    Vector4 Color
+    Vector4 Color,
+    float WidthStart = 1.0f,
+    float WidthEnd = 1.0f
 );

@@ -3,18 +3,31 @@ using ChangeTrace.Rendering.States;
 namespace ChangeTrace.Rendering.Interfaces;
 
 /// <summary>
-/// Represents target for rendered scene snapshots.
+/// Receives rendered scene snapshots.
 /// </summary>
-/// <remarks>
-/// Implementations receive immutable <see cref="RenderState"/> instances
-/// produced by the rendering pipeline and may display them, store them, or
-/// forward them to other systems (e.g., a UI canvas, video capture, or debugging output).
-/// </remarks>
 internal interface IRenderOutput
 {
     /// <summary>
-    /// Submits new <see cref="RenderState"/> for output.
+    /// Initializes rendering output resources.
     /// </summary>
-    /// <param name="state">The snapshot of scene to render.</param>
+    void Initialize(
+        int width,
+        int height);
+
+    /// <summary>
+    /// Resizes rendering output viewport.
+    /// </summary>
+    void Resize(
+        int width,
+        int height);
+
+    /// <summary>
+    /// Submits immutable render state snapshot.
+    /// </summary>
     void Submit(RenderState state);
+
+    /// <summary>
+    /// Enables or disables beam rendering.
+    /// </summary>
+    static bool ShowBeams { get; set; } = true;
 }
