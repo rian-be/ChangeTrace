@@ -1,0 +1,84 @@
+#version 430 core
+
+// Heatmap compute shader.
+// Accumulates object influence into low resolution RGBA32F texture.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// Heatmap object data.
+// xy = center in heatmap texture space
+// z  = radius
+// w  = intensity
+layout(std430, binding = 0) readonly buffer ObjectData
+{
+    vec4 objects[];
+};
+
+layout(rgba32f, binding = 1) writeonly uniform image2D heatmapImage;
+
+uniform int objectCount;
+uniform float maxValue;
+
+void main()
+{
+    ivec2 size = imageSize(heatmapImage);
+
+    ivec2 ip = ivec2(gl_GlobalInvocationID.xy);
+
+    if (ip.x >= size.x || ip.y >= size.y)
+    return;
+
+    vec2 p = vec2(ip);
+
+    float field = 0.0;
+
+    for (int i = 0; i < objectCount; i++)
+    {
+        vec4 o = objects[i];
+
+        vec2 center = o.xy;
+        float radius = max(o.z, 1.0);
+        float intensity = max(o.w, 0.0);
+
+        vec2 d = p - center;
+
+        // Cheap square bounds rejection before circular test.
+        if (abs(d.x) > radius || abs(d.y) > radius)
+        continue;
+
+        float dist2 = dot(d, d);
+        float r2 = radius * radius;
+
+        if (dist2 > r2)
+        continue;
+
+        // Smooth radial falloff.
+        float q = 1.0 - dist2 / r2;
+        field += q * q * intensity;
+    }
+
+    // Normalize accumulated field into [0, 1].
+    float value = clamp(field / max(maxValue, 0.001), 0.0, 1.0);
+
+    if (value <= 0.001)
+    {
+        imageStore(heatmapImage, ip, vec4(0.0));
+        return;
+    }
+
+    // Activity color ramp.
+    vec3 blue = vec3(0.0, 0.1, 0.6);   // Low activity
+    vec3 cyan = vec3(0.0, 0.9, 1.0);   // Single author / normal
+    vec3 orange = vec3(1.0, 0.5, 0.0);   // Multiple authors / active
+    vec3 red = vec3(1.0, 0.05, 0.0);  // Hotspot
+    vec3 white = vec3(1.0, 0.95, 0.8);  // White hot
+
+    vec3 color = mix(blue, cyan, smoothstep(0.0, 0.2, value));
+    color = mix(color, orange, smoothstep(0.2, 0.5, value));
+    color = mix(color, red, smoothstep(0.5, 0.8, value));
+    color = mix(color, white, smoothstep(0.8, 1.0, value));
+
+    // Final heatmap opacity.
+    float alpha = value * 0.35;
+    imageStore(heatmapImage, ip, vec4(color, alpha));
+}
