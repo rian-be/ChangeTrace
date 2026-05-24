@@ -1,0 +1,113 @@
+#version 460 core
+
+// Particle visibility compute shader.
+// Compacts visible particles into a draw buffer
+// and updates the indirect draw command.
+
+layout(local_size_x = 256) in;
+
+struct Particle
+{
+    vec2 position;
+    float size;
+    float alpha;
+
+    vec4 color;
+};
+
+struct DrawArraysIndirectCommand
+{
+    uint count;
+    uint instanceCount;
+    uint first;
+    uint baseInstance;
+};
+
+layout(std430, binding = 0) readonly buffer InputParticles
+{
+    Particle inputParticles[];
+};
+
+layout(std430, binding = 1) writeonly buffer VisibleParticles
+{
+    Particle visibleParticles[];
+};
+
+// Visible particle counter.
+// Must be reset before dispatch.
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    uint visibleCount;
+};
+
+// Indirect draw command used by DrawArraysIndirect.
+layout(std430, binding = 3) buffer IndirectBuffer
+{
+    DrawArraysIndirectCommand cmd;
+};
+
+uniform int uParticleCount;
+uniform mat3 uViewProj;
+uniform vec2 uViewport;
+uniform float uZoom;
+
+// Tests whether particle is inside the current NDC view.
+// radiusPixels adds a conservative screen-space margin.
+bool IsVisible(vec2 ndc, float radiusPixels)
+{
+    vec2 margin =
+    radiusPixels /
+    max(uViewport * 0.5, vec2(1.0));
+
+    return
+    ndc.x >= -1.0 - margin.x &&
+    ndc.x <=  1.0 + margin.x &&
+    ndc.y >= -1.0 - margin.y &&
+    ndc.y <=  1.0 + margin.y;
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+
+    if (id >= uint(uParticleCount))
+    {
+        return;
+    }
+
+    Particle particle = inputParticles[id];
+
+    // Skip dead or invisible particles.
+    if (particle.alpha <= 0.001 || particle.size <= 0.001)
+    {
+        return;
+    }
+
+    vec3 clip =
+    uViewProj *
+    vec3(particle.position, 1.0);
+
+    // Convert world space particle size into rough pixel radius.
+    float radiusPixels =
+    max(particle.size * uZoom, 1.0);
+
+    if (!IsVisible(clip.xy, radiusPixels))
+    {
+        return;
+    }
+
+    // Reserve compacted output slot.
+    uint dst =
+    atomicAdd(visibleCount, 1);
+
+    visibleParticles[dst] = particle;
+
+    // Keep static indirect draw fields initialized.
+    // For best performance, these can be initialized once on CPU.
+    cmd.count = 1u;
+    cmd.first = 0u;
+    cmd.baseInstance = 0u;
+
+    // Store visible instance count for DrawArraysIndirect.
+    cmd.instanceCount = visibleCount;
+}

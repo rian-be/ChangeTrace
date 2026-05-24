@@ -1,0 +1,98 @@
+#version 460 core
+
+// Pawn visibility compute shader.
+// Filters dead/offscreen pawns, compacts visible pawns,
+// and prepares the indirect draw command.
+
+layout(local_size_x = 256) in;
+
+struct Pawn
+{
+    vec2 position;
+    float radius;
+    float alpha;
+    vec4 color;
+    float glow;
+    vec3 padding;
+};
+
+struct DrawArraysIndirectCommand
+{
+    uint count;
+    uint instanceCount;
+    uint first;
+    uint baseInstance;
+};
+
+layout(std430, binding = 0) readonly buffer InputPawns
+{
+    Pawn inputPawns[];
+};
+
+layout(std430, binding = 1) writeonly buffer VisiblePawns
+{
+    Pawn visiblePawns[];
+};
+
+// Visible pawn counter.
+// Must be reset before dispatch.
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    uint visibleCount;
+};
+
+layout(std430, binding = 3) buffer IndirectBuffer
+{
+    DrawArraysIndirectCommand cmd;
+};
+
+uniform int uPawnCount;
+uniform mat3 uViewProj;
+uniform vec2 uViewport;
+uniform float uZoom;
+
+// Conservative NDC visibility test with screen space radius margin.
+bool IsVisible(vec2 ndc, float radiusPixels)
+{
+    vec2 margin = radiusPixels / max(uViewport * 0.5, vec2(1.0));
+
+    return
+    ndc.x >= -1.0 - margin.x &&
+    ndc.x <=  1.0 + margin.x &&
+    ndc.y >= -1.0 - margin.y &&
+    ndc.y <=  1.0 + margin.y;
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+
+    if (id >= uint(uPawnCount))
+    return;
+
+    Pawn pawn = inputPawns[id];
+
+    // Skip dead or degenerate pawns.
+    if (pawn.alpha <= 0.001 || pawn.radius <= 0.001)
+    {
+        return;
+    }
+
+    vec3 clip = uViewProj * vec3(pawn.position, 1.0);
+    float radiusPixels = max(pawn.radius * uZoom, 1.0);
+
+    if (!IsVisible(clip.xy, radiusPixels))
+    {
+        return;
+    }
+
+    // Reserve one compacted output slot.
+    uint dst = atomicAdd(visibleCount, 1);
+    visiblePawns[dst] = pawn;
+
+    // Indirect draw command for quad instances.
+    cmd.count = 6u;
+    cmd.first = 0u;
+    cmd.baseInstance = 0u;
+    cmd.instanceCount = visibleCount;
+}

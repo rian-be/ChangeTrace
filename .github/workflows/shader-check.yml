@@ -1,0 +1,110 @@
+name: Shader Check
+
+on:
+  pull_request:
+    paths:
+      - "Assets/**"
+      - "src/Graphics/Shaders/**"
+      - "src/Graphics/Gpu/**"
+      - "src/Graphics/Rendering/**"
+      - ".github/workflows/shader-check.yml"
+
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - "Assets/**"
+      - "src/Graphics/Shaders/**"
+      - "src/Graphics/Gpu/**"
+      - "src/Graphics/Rendering/**"
+
+permissions:
+  contents: read
+
+jobs:
+  shader-check:
+    name: Shader validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ChangeTrace.csproj
+
+      - name: Build
+        run: dotnet build ChangeTrace.csproj -c Release --no-restore
+
+      - name: Discover shader directory
+        run: |
+          echo "Looking for shader files..."
+
+          find . -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \)
+
+      - name: Validate shader files exist
+        run: |
+          SHADER_COUNT=$(find . -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) | wc -l)
+
+          echo "Shader files found: $SHADER_COUNT"
+
+          if [ "$SHADER_COUNT" -eq 0 ]; then
+            echo "No shader files found."
+            exit 1
+          fi
+
+      - name: Detect empty shaders
+        run: |
+          EMPTY_FILES=$(find . -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) -size 0)
+
+          if [ -n "$EMPTY_FILES" ]; then
+            echo "Empty shader files detected:"
+            echo "$EMPTY_FILES"
+            exit 1
+          fi
+
+      - name: Detect missing version directives
+        run: |
+          MISSING_VERSION=$(find . -type f \( -name "*.vert" -o -name "*.frag" -o -name "*.comp" \) -exec grep -L "^#version" {} \;)
+
+          if [ -n "$MISSING_VERSION" ]; then
+            echo "Shaders missing #version directive:"
+            echo "$MISSING_VERSION"
+            exit 1
+          fi
+
+      - name: Validate compute shaders have local size
+        run: |
+          BROKEN_COMP=$(find . -type f -name "*.comp" -exec grep -L "layout(local_size" {} \;)
+
+          if [ -n "$BROKEN_COMP" ]; then
+            echo "Compute shaders missing layout(local_size_x/y/z):"
+            echo "$BROKEN_COMP"
+            exit 1
+          fi
+
+      - name: Validate shader manifest exists
+        run: |
+          test -f src/Graphics/Shaders/Registry/ShaderManifest.cs
+
+      - name: Detect shader runtime references
+        run: |
+          echo "Graphics shader references:"
+          grep -R "Shaders.Graphics(\"" src || true
+
+          echo "Compute shader references:"
+          grep -R "Shaders.Compute(\"" src || true
+
+      - name: Validate assets copy rule
+        run: |
+          if ! grep -q "Assets/\*\*/\*" ChangeTrace.csproj; then
+            echo "ChangeTrace.csproj may not include Assets/**/* for output copy."
+            exit 1
+          fi

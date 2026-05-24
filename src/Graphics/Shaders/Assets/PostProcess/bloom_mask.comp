@@ -1,0 +1,32 @@
+#version 450 core
+
+// Input texture: Rendered scene (RGBA8)
+layout(binding = 0, rgba8) readonly uniform image2D inputTexture;
+
+// Output texture: Bloom mask (R8)
+layout(binding = 1, r8) writeonly uniform image2D bloomMask;
+
+// Work group size
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// Threshold for bright pixels
+uniform float bloomThreshold = 0.8;
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(inputTexture);
+
+    if (pixelCoord.x >= size.x || pixelCoord.y >= size.y) {
+        return;
+    }
+
+    // Read pixel from input texture
+    vec4 color = imageLoad(inputTexture, pixelCoord);
+    float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+
+    // Generate bloom mask (1.0 if bright, 0.0 otherwise)
+    float maskValue = (brightness > bloomThreshold) ? 1.0 : 0.0;
+
+    // Write to bloom mask
+    imageStore(bloomMask, pixelCoord, vec4(maskValue, 0.0, 0.0, 1.0));
+}

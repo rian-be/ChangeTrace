@@ -1,0 +1,67 @@
+name: Publish Attested
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.runtime }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        runtime:
+          - win-x64
+          - linux-x64
+          - linux-arm64
+          - osx-x64
+          - osx-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ChangeTrace.csproj
+
+      - name: Publish
+        run: >
+          dotnet publish ChangeTrace.csproj
+          -c Release
+          -r ${{ matrix.runtime }}
+          --self-contained false
+          -p:UseAppHost=true
+          -o publish/${{ matrix.runtime }}
+
+      - name: Pack artifact
+        run: |
+          mkdir -p dist
+
+          cd publish/${{ matrix.runtime }}
+
+          zip -r \
+            ../../dist/ChangeTrace-${{ matrix.runtime }}.zip \
+            .
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/ChangeTrace-${{ matrix.runtime }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChangeTrace-${{ matrix.runtime }}
+          path: dist/ChangeTrace-${{ matrix.runtime }}.zip

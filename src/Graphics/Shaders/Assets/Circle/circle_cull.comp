@@ -1,0 +1,104 @@
+#version 430 core
+
+// Compute shader responsible for node visibility culling.
+// Reads all circle nodes, keeps only visible ones,
+// and updates the indirect draw instance count.
+layout(local_size_x = 256) in;
+
+// GPU side node data.
+struct CircleNode
+{
+    vec2 position;
+    float radius;
+    float kind;
+
+    vec4 color;
+
+    float glow;
+    float pad0;
+    float pad1;
+    float pad2;
+};
+
+// OpenGL indirect draw command layout for DrawArraysIndirect.
+struct DrawArraysIndirectCommand
+{
+    uint count;
+    uint instanceCount;
+    uint first;
+    uint baseInstance;
+};
+
+// All input nodes before culling.
+layout(std430, binding = 0) readonly buffer InputNodes
+{
+    CircleNode nodes[];
+};
+
+// Compact output buffer containing only visible nodes.
+layout(std430, binding = 1) writeonly buffer VisibleNodes
+{
+    CircleNode visible[];
+};
+
+// Shared visible node counter.
+// Must be reset before dispatch.
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    uint visibleCount;
+};
+
+// Indirect draw command.
+// instanceCount is updated from visible counter.
+layout(std430, binding = 3) buffer IndirectBuffer
+{
+    DrawArraysIndirectCommand cmd;
+};
+
+uniform int uNodeCount;
+uniform mat3 uViewProj;
+uniform vec2 uViewport;
+
+// Tests whether node is inside the current clip space view.
+bool IsVisible(vec2 position, float radius)
+{
+    vec3 clip =
+    uViewProj *
+    vec3(position, 1.0);
+
+    // Conservative screen space margin based on node radius.
+    vec2 margin =
+    vec2(radius * 2.0) /
+    max(uViewport, vec2(1.0));
+
+    return
+    clip.x >= -1.0 - margin.x &&
+    clip.x <=  1.0 + margin.x &&
+    clip.y >= -1.0 - margin.y &&
+    clip.y <=  1.0 + margin.y;
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+
+    if (id >= uint(uNodeCount))
+    {
+        return;
+    }
+
+    CircleNode node = nodes[id];
+
+    if (!IsVisible(node.position, node.radius))
+    {
+        return;
+    }
+
+    // Reserve compacted output slot.
+    uint index = atomicAdd(visibleCount, 1);
+    visible[index] = node;
+
+    // Keep indirect draw instance count in sync.
+    // Assumes cmd.count/first/baseInstance were initialized elsewhere.
+    cmd.instanceCount = visibleCount;
+}
