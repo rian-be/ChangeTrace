@@ -137,7 +137,7 @@ internal sealed class TraceEventAggregationStage : IDisposable
     {
         foreach (var writer in _writers.Values)
         {
-            // ((ISemanticWriter)writer).Clear(); //todo: make interface ISemanticWriter and impl
+            ((ISemanticEventWriter)writer).Clear();
         }
 
         _commitCursor = 0;
