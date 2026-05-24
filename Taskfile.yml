@@ -1,0 +1,73 @@
+version: "3"
+
+vars:
+  PROJECT: ChangeTrace.csproj
+  TOOLS_PROJECT: Tools/ChangeTrace.Tools.csproj
+  CONFIG: '{{default "Debug" .CONFIG}}'
+  RUNTIME: '{{default "linux-x64" .RUNTIME}}'
+  TAG: '{{default "" .TAG}}'
+  PUBLISH_DIR: publish/{{.RUNTIME}}
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build app. Override with CONFIG=Release
+    cmds:
+      - dotnet restore {{.PROJECT}}
+      - dotnet build {{.PROJECT}} -c {{.CONFIG}} --no-restore
+
+  check:
+    desc: Run the standard local validation path
+    cmds:
+      - task: build
+        vars:
+          CONFIG: Release
+      - dotnet restore {{.TOOLS_PROJECT}}
+      - dotnet build {{.TOOLS_PROJECT}} -c Release --no-restore
+      - dotnet run --project {{.TOOLS_PROJECT}} -- assets validate
+
+  assets:atlas:
+    desc: Rebuild the language icon atlas
+    cmds:
+      - dotnet run --project {{.TOOLS_PROJECT}} -- assets atlas
+
+  publish:
+    desc: Publish one runtime. Override with RUNTIME=win-x64, linux-x64, linux-arm64, osx-x64, or osx-arm64
+    cmds:
+      - dotnet restore {{.PROJECT}}
+      - >
+        dotnet publish {{.PROJECT}}
+        -c Release
+        -r {{.RUNTIME}}
+        --self-contained false
+        -p:UseAppHost=true
+        -o {{.PUBLISH_DIR}}
+
+  pack:
+    desc: Publish and zip one runtime. Override with RUNTIME=...
+    deps:
+      - publish
+    cmds:
+      - mkdir -p dist
+      - cd {{.PUBLISH_DIR}} && zip -r ../../dist/ChangeTrace-{{.RUNTIME}}.zip .
+
+  prerelease:tag:
+    desc: Create and push a prerelease tag. Example TAG=v0.62.24-pre.1
+    preconditions:
+      - sh: test -n "{{.TAG}}"
+        msg: "Set TAG, for example: task prerelease:tag TAG=v0.62.24-pre.1"
+      - sh: echo "{{.TAG}}" | grep -Eq '^v[0-9]+(\.[0-9]+){1,2}-(pre|alpha|beta|rc)(\.[0-9]+)?$'
+        msg: "TAG must look like v0.62.24-pre.1, v0.62.24-alpha.1, v0.62.24-beta.1, or v0.62.24-rc.1"
+      - sh: test -z "$(git status --porcelain)"
+        msg: "Working tree must be clean before creating a release tag."
+      - sh: test -z "$(git tag -l "{{.TAG}}")"
+        msg: "Local tag already exists: {{.TAG}}"
+      - sh: test -z "$(git ls-remote --tags origin "refs/tags/{{.TAG}}")"
+        msg: "Remote tag already exists on origin: {{.TAG}}"
+    cmds:
+      - git tag -a "{{.TAG}}" -m "ChangeTrace {{.TAG}}"
+      - git push origin "{{.TAG}}"

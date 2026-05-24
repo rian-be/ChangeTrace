@@ -4,6 +4,17 @@ using System.Runtime.CompilerServices;
 namespace ChangeTrace.Core.Events.Semantic;
 
 /// <summary>
+/// Non-generic contract used to clear semantic event writers after a frame flush.
+/// </summary>
+public interface ISemanticEventWriter
+{
+    /// <summary>
+    /// Clears all written events without releasing the underlying buffer.
+    /// </summary>
+    void Clear();
+}
+
+/// <summary>
 /// Writer for semantic events of type <typeparamref name="T"/>.
 /// </summary>
 /// <remarks>
@@ -15,7 +26,7 @@ namespace ChangeTrace.Core.Events.Semantic;
 /// </list>
 /// </remarks>
 /// <typeparam name="T">Type of event stored in the writer.</typeparam>
-public sealed class SemanticEventWriter<T>(int initialCapacity = 128) : IDisposable
+public sealed class SemanticEventWriter<T>(int initialCapacity = 128) : ISemanticEventWriter, IDisposable
 {
     private T[] _buffer = ArrayPool<T>.Shared.Rent(initialCapacity);
     private int _count = 0;

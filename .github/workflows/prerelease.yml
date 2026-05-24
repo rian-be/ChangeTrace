@@ -1,0 +1,142 @@
+name: Pre Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Pre-release tag, for example v0.62.24-pre.1"
+        required: true
+        type: string
+      release_name:
+        description: "Release title. Defaults to tag name."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*-pre*"
+      - "v*-alpha*"
+      - "v*-beta*"
+      - "v*-rc*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.runtime }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - win-x64
+          - linux-x64
+          - linux-arm64
+          - osx-x64
+          - osx-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ChangeTrace.csproj
+
+      - name: Publish
+        run: >
+          dotnet publish ChangeTrace.csproj
+          -c Release
+          -r ${{ matrix.runtime }}
+          --self-contained false
+          -p:UseAppHost=true
+          -o publish/${{ matrix.runtime }}
+
+      - name: Pack artifact
+        run: |
+          mkdir -p dist
+
+          cd publish/${{ matrix.runtime }}
+
+          zip -r \
+            ../../dist/ChangeTrace-${{ matrix.runtime }}.zip \
+            .
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/ChangeTrace-${{ matrix.runtime }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChangeTrace-${{ matrix.runtime }}
+          path: dist/ChangeTrace-${{ matrix.runtime }}.zip
+
+  release:
+    name: Create GitHub pre-release
+    runs-on: ubuntu-latest
+    needs: publish
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ inputs.tag_name }}"
+            RELEASE_NAME="${{ inputs.release_name }}"
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+            RELEASE_NAME=""
+          fi
+
+          if [ -z "$RELEASE_NAME" ]; then
+            RELEASE_NAME="$TAG_NAME"
+          fi
+
+          if ! echo "$TAG_NAME" | grep -Eq '^v[0-9]+(\.[0-9]+){1,2}-(pre|alpha|beta|rc)(\.[0-9]+)?$'; then
+            echo "Tag must be a pre-release tag like v0.62.24-pre.1, v0.62.24-alpha.1, v0.62.24-beta.1, or v0.62.24-rc.1"
+            exit 1
+          fi
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum ChangeTrace-*.zip > SHA256SUMS.txt
+
+      - name: Create or update pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+          RELEASE_NAME: ${{ steps.meta.outputs.release_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" dist/ChangeTrace-*.zip dist/SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG_NAME" \
+              dist/ChangeTrace-*.zip \
+              dist/SHA256SUMS.txt \
+              --prerelease \
+              --title "$RELEASE_NAME" \
+              --target "$GITHUB_SHA" \
+              --notes "Automated ChangeTrace pre-release build."
+          fi
