@@ -1,0 +1,58 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: '🚀 Features'
+    labels:
+      - feature
+      - feat
+  - title: '🐛 Fixes'
+    labels:
+      - bug
+      - fix
+  - title: '⚡ Performance'
+    labels:
+      - perf
+      - performance
+      - gpu
+      - renderer
+  - title: '🧱 Architecture'
+    labels:
+      - architecture
+      - ecs
+      - layout
+  - title: '🧪 Tests'
+    labels:
+      - tests
+  - title: '📚 Documentation'
+    labels:
+      - docs
+  - title: '🔧 CI'
+    labels:
+      - ci
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+      - feature
+      - feat
+  patch:
+    labels:
+      - bug
+      - fix
+      - perf
+      - docs
+      - ci
+      - tests
+  default: patch
+
+template: |
+  ## Changes
+
+  $CHANGES

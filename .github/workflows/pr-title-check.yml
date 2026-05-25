@@ -1,0 +1,19 @@
+name: PR Title Check
+
+on:
+  pull_request_target:
+    types: [ opened, edited, synchronize, reopened ]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  check-title:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check PR title
+        uses: thehanimo/pr-title-checker@v1.4.3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          regex: '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\([a-z0-9-]+\))?: .+$'
