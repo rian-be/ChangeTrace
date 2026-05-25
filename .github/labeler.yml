@@ -1,0 +1,41 @@
+renderer:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/Graphics/**
+          - src/Rendering/**
+
+gpu:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Assets/Shaders/**
+          - src/**/Gpu/**
+          - src/**/OpenGL/**
+
+layout:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/**/Layout/**
+
+ecs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/**/ECS/**
+          - src/**/Entities/**
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - tests/**
+          - "**/*Tests.cs"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Docs/**
+          - readme.md
+          - "*.md"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
