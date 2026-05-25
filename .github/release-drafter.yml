@@ -1,0 +1,34 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+    labels:
+    labels:
+      - bug
+    labels:
+    labels:
+    labels:
+      - tests
+    labels:
+    labels:
+      - ci
+
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+  patch:
+    labels:
+      - bug
+      - ci
+      - tests
+  default: patch
+
+template: |
+  ## Changes
+
+  $CHANGES
