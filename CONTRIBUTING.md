@@ -2,6 +2,8 @@
 
 Small and focused changes are easiest to review.
 
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Before You Start
 
 * check existing issues and pull requests

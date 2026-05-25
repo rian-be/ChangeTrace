@@ -1,6 +1,6 @@
 # ChangeTrace
 
-<table width="100%">
+<table  widtxh="100%">
   <tr>
     <td align="left">
       <a href="https://learn.microsoft.com/dotnet/csharp/"><img alt="Language: C#" src="https://img.shields.io/badge/Language-C%23-239120?style=flat-square&logo=csharp&logoColor=white"></a>
@@ -75,10 +75,12 @@ For local development, replace `./changetrace` with `dotnet run --`.
 The repository is split into a few clear layers:
 
 - `src/Core` contains the event model, rules, and shared processing
+- `src/Configuration` contains app settings, converters, and service discovery helpers
 - `src/GIt` reads repositories, builds timelines, and enriches data
 - `src/CredentialTrace` handles auth, sessions, and local storage
 - `src/Rendering` builds the timeline scene and state
 - `src/Graphics` owns the rendering runtime, shaders, and GPU helpers
+- `src/Player` handles timeline playback flow and speed control
 - `src/Cli` wires commands to handlers
 - `Tools` contains repository utilities and asset maintenance scripts
 
@@ -86,24 +88,24 @@ The repository is split into a few clear layers:
 
 ChangeTrace stores local auth data under the user profile:
 
-- On Unix-like systems the data lives under `~/.changetrace/`.
+- On Unix like systems the data lives under `~/.changetrace/`.
 - On Windows it uses the equivalent user profile directory.
 - `auth.json` contains session metadata and encrypted tokens.
 - `auth.key` contains the local key used by the token store.
 
 This protects against accidental plaintext exposure in `auth.json`, but it is not a full operating-system keychain. A process running as the same user can still read both files.
 
-## Build
-
-Use the standard .NET build to verify the project:
-
-```bash
-dotnet build
-```
-
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+## Code of Conduct
+
+Please read and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+For vulnerability reporting, see [Security Policy](SECURITY.md).
 
 ---
 
