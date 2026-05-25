@@ -1,0 +1,7 @@
+addAssignees: author
+
+addReviewers: false
+
+skipKeywords:
+  - wip
+  - draft

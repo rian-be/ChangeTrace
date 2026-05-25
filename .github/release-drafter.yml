@@ -1,0 +1,83 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+category-template: '### $TITLE'
+no-changes-template: '- No user-facing changes.'
+sort-by: merged_at
+sort-direction: descending
+
+categories:
+  - title: 'Enhancements'
+    labels:
+      - enhancement
+  - title: 'Fixes'
+    labels:
+      - bug
+  - title: 'Tasks'
+    collapse-after: 8
+    labels:
+      - task
+  - title: 'Architecture'
+    labels:
+      - Architecture
+  - title: 'Gpu'
+    labels:
+      - Gpu
+  - title: 'Layout'
+    labels:
+      - Layout
+  - title: 'Renderer'
+    labels:
+      - Renderer
+  - title: 'Tests'
+    collapse-after: 8
+    labels:
+      - tests
+  - title: 'Documentation'
+    labels:
+      - documentation
+  - title: 'CI'
+    collapse-after: 8
+    labels:
+      - ci
+  - title: 'Performance'
+    labels:
+      - Performance
+
+change-template: '- $TITLE ([#$NUMBER]($URL)) by @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+      - enhancement
+  patch:
+    labels:
+      - bug
+      - task
+      - Gpu
+      - Layout
+      - Renderer
+      - Performance
+      - documentation
+      - ci
+      - tests
+  default: patch
+
+header: |
+  ## ChangeTrace $RESOLVED_VERSION
+
+template: |
+  ## Changes
+
+  $CHANGES
+
+footer: |
+  ## Contributors
+
+  $CONTRIBUTORS
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
