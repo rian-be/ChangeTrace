@@ -1,0 +1,20 @@
+{
+  "LABEL": {
+    "name": "",
+    "color": "EEEEEE"
+  },
+  "CHECKS": {
+    "regexp": "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(\\([a-z0-9-]+\\))?: .+$",
+    "regexpFlags": "i",
+    "ignoreLabels": [
+      "State One",
+      "State Two"
+    ],
+    "alwaysPassCI": false
+  },
+  "MESSAGES": {
+    "success": "PR title matches the required format.",
+    "failure": "PR title must match: type(optional-scope): description",
+    "notice": "Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore."
+  }
+}

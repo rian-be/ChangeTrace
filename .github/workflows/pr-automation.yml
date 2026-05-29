@@ -1,19 +1,43 @@
-name: PR Automation
+name: Pull Request Automation
 
 on:
   pull_request_target:
-    types: [ opened, edited, synchronize, reopened ]
+    types: [ opened, edited, synchronize, reopened, ready_for_review, labeled, unlabeled ]
 
 permissions:
   contents: read
-  pull-requests: write
   issues: write
+  pull-requests: write
 
 jobs:
-  label:
-    name: Label PR
+  assign-author:
+    if: github.event.action == 'opened' || github.event.action == 'ready_for_review'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Assign PR author
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/config/auto-assign.yml
+
+  title-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check PR title
+        uses: thehanimo/pr-title-checker@v1.4.3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pass_on_octokit_error: false
+          configuration_path: .github/config/pr-title-checker.json
+
+  labeler:
     runs-on: ubuntu-latest
 
     steps:
       - name: Label changed files
-        uses: actions/labeler@v5
+        uses: actions/labeler@v6
+        with:
+          configuration-path: .github/config/labeler.yml
+          sync-labels: true

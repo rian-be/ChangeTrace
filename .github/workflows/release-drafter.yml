@@ -1,6 +1,7 @@
 name: Release Drafter
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -14,5 +15,8 @@ jobs:
 
     steps:
       - name: Update release draft
+        uses: release-drafter/release-drafter@v7
+        with:
+          config-name: release-drafter.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

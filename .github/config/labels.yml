@@ -1,55 +1,51 @@
 - name: bug
-  color: d73a4a
+  color: "d73a4a"
   description: Something isn't working
 
 - name: enhancement
-  color: a2eeef
+  color: "a2eeef"
   description: New feature or request
 
 - name: documentation
-  color: 0075ca
+  color: "0075ca"
   description: Improvements or additions to documentation
 
-- name: State One
-  color: 0e8a16
-  description: Workflow state one
-
-- name: State Two
-  color: bfdadc
-  description: Workflow state two
-
 - name: Architecture
-  color: 8B5E3C
+  color: "8B5E3C"
   description: Architecture-related changes
 
 - name: Gpu
-  color: 3A7D8C
+  color: "3A7D8C"
   description: GPU-related rendering changes
 
 - name: Layout
-  color: 5B4B8A
+  color: "5B4B8A"
   description: Layout engine and visualization changes
 
 - name: Renderer
-  color: 8A4F7D
+  color: "8A4F7D"
   description: Renderer pipeline and visual output changes
 
-- name: task
-  color: 1d76db
+- name: Task
+  color: "1d76db"
   description: Track a concrete implementation task
 
-- name: ci
-  color: 5319e7
+- name: Ci
+  color: "5319e7"
   description: CI/CD and automation changes
 
 - name: tests
-  color: fbca04
+  color: "fbca04"
   description: Test coverage and test changes
 
 - name: Performance
-  color: 0e4d92
+  color: "0e4d92"
   description: Performance improvements or regressions
 
 - name: breaking-change
-  color: b60205
+  color: "b60205"
   description: Introduces a breaking change
+
+- name: skip-changelog
+  color: "ededed"
+  description: Exclude this change from release notes

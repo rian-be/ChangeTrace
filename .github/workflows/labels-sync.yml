@@ -1,21 +1,21 @@
- name: Labels Sync
-  
+name: Labels Sync
+
 on:
   push:
     branches: [ main ]
     paths:
-      - .github/labels.yml
+      - .github/config/labels.yml
       - .github/workflows/labels-sync.yml
-    workflow_dispatch:
-  
+  workflow_dispatch:
+
 permissions:
   issues: write
   contents: read
-  
+
 jobs:
   sync:
     runs-on: ubuntu-latest
-      
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -23,5 +23,5 @@ jobs:
       - name: Sync repository labels
         uses: EndBug/label-sync@v2
         with:
-            config-file: .github/labels.yml
-            delete-other-labels: true
+          config-file: .github/config/labels.yml
+          delete-other-labels: true
