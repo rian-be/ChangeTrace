@@ -20,14 +20,12 @@ exclude-contributors:
   - dependabot
   - dependabot[bot]
 
-categories:
-  - type: pre-exclude
-    when:
-      labels:
-        - skip-changelog
-        - State One
-        - State Two
+exclude-labels:
+  - skip-changelog
+  - State One
+  - State Two
 
+categories:
   - title: 'Breaking Changes'
     semver-increment: major
     collapse-after: -1
@@ -116,18 +114,17 @@ categories:
     semver-increment: patch
     collapse-after: 8
 
-  - type: version-resolver
-    semver-increment: major
-    when:
-      label: breaking-change
-
-  - type: version-resolver
-    semver-increment: minor
-    when:
-      label: enhancement
-
-  - type: version-resolver
-    semver-increment: patch
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+      - enhancement
+  patch:
+    labels:
+      - bug
+  default: patch
 
 template: |
   $CHANGES
