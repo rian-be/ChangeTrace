@@ -20,7 +20,7 @@ Renderer:
 tests:
   - changed-files:
       - any-glob-to-any-file:
-          - tests/**
+          - Tests/**
           - '**/*Tests.cs'
 
 documentation:

@@ -41,5 +41,9 @@ internal class WorkCommand : ICliCommand
     /// </summary>
     /// <returns>Configured <see cref="Command"/> for workspace subcommands.</returns>
     public Command Build()
-        => new("workspace", "Workspace management");
+    {
+        var cmd = new Command("workspace", "Workspace management");
+        cmd.Aliases.Add("ws");
+        return cmd;
+    }
 }

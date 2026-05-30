@@ -35,9 +35,13 @@ internal sealed class WorkListCommand : ICliCommand
     /// Builds <see cref="Command"/> representing <c>workspace list</c> command.
     /// </summary>
     /// <returns>Configured <see cref="Command"/> with optional filtering options.</returns>
-    public Command Build() =>
-        new("list", "List workspaces")
+    public Command Build()
+    {
+        var cmd = new Command("list", "List workspaces")
         {
-            new Option<string>("--org") { Description = "Organization name" }
+            new Option<string?>("--org", "-o") { Description = "Organization name. When omitted, all workspaces are listed." }
         };
+        cmd.Aliases.Add("ls");
+        return cmd;
+    }
 }

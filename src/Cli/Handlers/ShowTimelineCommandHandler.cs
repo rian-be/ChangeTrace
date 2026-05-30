@@ -1,22 +1,15 @@
 using System.CommandLine;
 using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
-using ChangeTrace.Core.Models;
-using ChangeTrace.Core.Services;
+using ChangeTrace.Core.Diagnostics;
 using ChangeTrace.Core.Specifications.Queries;
 using ChangeTrace.Core.Specifications.Queries.Commits;
-using ChangeTrace.GIt.Dto;
 using ChangeTrace.GIt.Interfaces;
-using ChangeTrace.Player.Factory;
-using ChangeTrace.Rendering;
-using ChangeTrace.Rendering.Factory;
-using MessagePack;
-using MessagePack.Resolvers;
-using Microsoft.Extensions.DependencyInjection;
-using ChangeTrace.Core.Diagnostics;
 using ChangeTrace.Graphics.Window;
+using ChangeTrace.Player.Factory;
+using ChangeTrace.Rendering.Factory;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Handlers;
 
@@ -31,37 +24,27 @@ internal sealed class ShowTimelineCommandHandler(
     IRenderSystemFactory renderFactory,
     IDiagnosticsProvider diagnostics): ICliHandler
 {
-    public Task HandleAsync(ParseResult parseResult, CancellationToken ct)
+    public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
         var filePath = parseResult.GetValue<string>("file")!;
         if (!File.Exists(filePath))
         {
             Console.WriteLine($"[red]File not found: {filePath}[/]");
-            return Task.CompletedTask;
+            return;
         }
 
         try
         {
             var data = File.ReadAllBytes(filePath);
-            var timeline = serializer.DeserializeAsync(data, ct).GetAwaiter().GetResult();
-            
+            var timeline = await serializer.DeserializeAsync(data, ct);
+
             //timeline.Normalize();
-        
+
             var player = playerFactory.Create(
                 timeline,
                 initialSpeed: 1.5,
                 acceleration: 2.5);
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
+
             var random = new Random();
             var eventsSample = timeline.Events
                // .OrderBy(_ => random.Next())
@@ -99,7 +82,7 @@ internal sealed class ShowTimelineCommandHandler(
                     }
                 )
             );
-            
+
       /*
             var actorResult = ActorName.Create("Bryan Chen");
             if (!actorResult.IsSuccess)
@@ -111,11 +94,11 @@ internal sealed class ShowTimelineCommandHandler(
             Console.WriteLine($"[red] actorc: {actorc.ToString()}[/]");
             var spec = CommitQueries.EnrichedMerges()
                 .And(CommitQueries.ByAuthor(actorc));
-            
+
             var filteredEvents = timeline.Events
                 .Where(e => spec.IsSatisfiedBy(e))
                 .ToList();
-            
+
             var grouped = filteredEvents
                 .GroupBy(e => e.CommitSha)
                 .Select(g => new { CommitSha = g.Key, Count = g.Count() })
@@ -125,7 +108,7 @@ internal sealed class ShowTimelineCommandHandler(
             {
                 Console.WriteLine($"{g.CommitSha}: {g.Count} razy");
             }
- 
+
             */
            // var spec2 = OwnershipQueries.DirectoryOwners("src/Engine");
             var spec2 = OwnershipQueries.DirectoryOwners("extensions/csharp/snippets/");
@@ -137,9 +120,7 @@ internal sealed class ShowTimelineCommandHandler(
                 .ToList();
 
             Console.WriteLine($"Autorzy zmian w katalogu extensions/csharp/snippets/: {string.Join(", ", authorsInDir)}");
-            
-            
-            
+
             var parentSpec = CommitRelationshipQueries.Parent("0a2f0cbc5c7ebc4573ba93c7b4c007efb1110856");
             var childSpec  = CommitRelationshipQueries.Children("0a2f0cbc5c7ebc4573ba93c7b4c007efb1110856");
 
@@ -169,7 +150,7 @@ internal sealed class ShowTimelineCommandHandler(
             };
 
            // Console.WriteLine(JsonSerializer.Serialize(hierarchy, new JsonSerializerOptions{ WriteIndented = true }));
-           
+
             using var debugWindow = new DebugWindow(diagnostics);
             using var window = new PlayerWindow(timeline, playerFactory, renderFactory, diagnostics);
             window.SetDebugWindow(debugWindow);
@@ -178,8 +159,7 @@ internal sealed class ShowTimelineCommandHandler(
         catch (Exception ex)
         {
             Console.WriteLine($"[red]Failed to read or deserialize file: {ex.Message}[/]");
+            return;
         }
-
-        return Task.CompletedTask;
     }
 }

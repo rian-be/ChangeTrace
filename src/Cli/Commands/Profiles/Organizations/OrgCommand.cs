@@ -41,5 +41,9 @@ internal sealed class OrgCommand : ICliCommand
     /// </summary>
     /// <returns>Configured <see cref="Command"/> for organization subcommands.</returns>
     public Command Build()
-        => new("org", "Organization management");
+    {
+        var cmd = new Command("org", "Organization management");
+        cmd.Aliases.Add("organization");
+        return cmd;
+    }
 }

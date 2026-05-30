@@ -12,34 +12,46 @@ using Spectre.Console;
 namespace ChangeTrace.Cli.Handlers;
 
 /// <summary>
-/// CLI handler responsible for exporting a Git repository into a ChangeTrace timeline file.
+/// Exports Git repository into ChangeTrace timeline file.
 /// </summary>
-/// <remarks>
-/// <list type="bullet">
-/// <item>Resolves authentication token from CLI option or stored session.</item>
-/// <item>Detects repository provider automatically.</item>
-/// <item>Invokes <see cref="IRepositoryExporter"/> to perform export pipeline.</item>
-/// <item>Displays progress and result using Spectre.Console UI.</item>
-/// </list>
-/// </remarks>
 [AutoRegister(ServiceLifetime.Transient, typeof(ExportCommandHandler))]
 internal sealed class ExportCommandHandler(
     IAuthService sessionAuthStore,
+    IWorkspaceContext workspaceContext,
+    IWorkspaceTimelineStorage workspaceTimelineStorage,
     IRepositoryExporter exporter) : ICliHandler
 {
     /// <summary>
-    /// Executes the export command.
+    /// Runs the repository export command.
     /// </summary>
-    /// <param name="parseResult">Parsed CLI arguments.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Task representing asynchronous command execution.</returns>
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
         var repo = parseResult.GetValue<string>("repository")!;
-        var output = parseResult.GetValue<string>("--output")!;
+        var explicitOutput = parseResult.GetValue<string?>("--output");
         var token = parseResult.GetValue<string?>("--token");
         var verbose = parseResult.GetValue<bool>("--verbose");
-        
+        var exportedAt = DateTimeOffset.UtcNow;
+
+        var output = explicitOutput;
+        var workspace = workspaceContext.Current;
+
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            if (workspace == null)
+            {
+                AnsiConsole.MarkupLine(
+                    "[red]Failed:[/] no active workspace selected. Use [yellow]workspace use <org> <name>[/] or pass [yellow]--output/-o[/].");
+                return;
+            }
+
+            output = await workspaceTimelineStorage.CreateTimelinePathAsync(
+                workspace,
+                repo,
+                exportedAt,
+                Ulid.NewUlid().ToString(),
+                ct);
+        }
+
         if (string.IsNullOrWhiteSpace(token))
         {
             var provider = ProviderUrlHelper.DetectProvider(repo);
@@ -71,8 +83,15 @@ internal sealed class ExportCommandHandler(
                 return await exporter.ExportAndSaveAsync(repo, output, options, progress, ct);
             });
 
-        AnsiConsole.MarkupLine(result.IsSuccess
-            ? $"[green]Exported successfully to {output}[/]"
-            : $"[red]Failed: {result.Error}[/]");
+        if (result.IsFailure)
+        {
+            AnsiConsole.MarkupLine($"[red]Failed:[/] {Markup.Escape(result.Error ?? "Unknown error")}");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(explicitOutput) && workspace != null)
+            await workspaceTimelineStorage.SaveMetadataAsync(output, workspace, repo, exportedAt, ct);
+
+        AnsiConsole.MarkupLine($"[green]Exported successfully to[/] {Markup.Escape(output)}");
     }
 }

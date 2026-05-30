@@ -14,8 +14,8 @@ namespace ChangeTrace.Cli.Commands.Profiles.Workspaces;
 /// <list type="bullet">
 /// <item>Child command of <see cref="WorkCommand"/>.</item>
 /// <item>Delegates execution to <see cref="WorkUseCommandHandler"/>.</item>
-/// <item>Requires workspace name argument.</item>
-/// <item>Optionally specifies the organization using <c>--org</c> option.</item>
+/// <item>Accepts optional organization and workspace arguments.</item>
+/// <item>Prompts for missing values in interactive terminals.</item>
 /// <item>Registered automatically as singleton via <see cref="AutoRegisterAttribute"/>.</item>
 /// </list>
 /// </remarks>
@@ -36,9 +36,22 @@ internal sealed class WorkUseCommand : ICliCommand
     /// Builds the <see cref="Command"/> instance representing the <c>workspace use</c> command.
     /// </summary>
     /// <returns>A configured <see cref="Command"/> with required arguments and optional organization filter.</returns>
-    public Command Build() => new("use", "Select workspace to play")
+    public Command Build()
     {
-        new Argument<string>("org") { Description = "Organization name" },
-        new Argument<string>("name") { Description = "Workspace name" }
-    };
+        var cmd = new Command("use", "Select active workspace");
+        cmd.Aliases.Add("switch");
+        cmd.Aliases.Add("select");
+        cmd.Arguments.Add(new Argument<string?>("org")
+        {
+            Description = "Organization name",
+            Arity = ArgumentArity.ZeroOrOne
+        });
+        cmd.Arguments.Add(new Argument<string?>("name")
+        {
+            Description = "Workspace name",
+            Arity = ArgumentArity.ZeroOrOne
+        });
+
+        return cmd;
+    }
 }

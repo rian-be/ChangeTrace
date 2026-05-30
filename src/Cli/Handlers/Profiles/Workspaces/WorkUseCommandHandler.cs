@@ -3,23 +3,14 @@ using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Interfaces;
 using ChangeTrace.CredentialTrace.Profiles;
-using ChangeTrace.CredentialTrace.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace ChangeTrace.Cli.Handlers.Profiles.Workspaces;
 
 /// <summary>
-/// Handler for 'workspace use' CLI command that sets a workspace as the current active workspace.
+/// Sets the active workspace.
 /// </summary>
-/// <remarks>
-/// <list type="bullet">
-/// <item>Implements <see cref="ICliHandler"/> to update the current <see cref="WorkspaceProfile"/> in <see cref="IWorkspaceContext"/>.</item>
-/// <item>Validates that the organization exists using <see cref="IProfileStore{OrganizationProfile}"/>.</item>
-/// <item>Validates that the workspace exists in the given organization using <see cref="IProfileStore{WorkspaceProfile}"/>.</item>
-/// <item>Displays a confirmation panel with workspace and organization details on success.</item>
-/// </list>
-/// </remarks>
 [AutoRegister(ServiceLifetime.Transient, typeof(WorkUseCommandHandler))]
 internal sealed class WorkUseCommandHandler(
     IProfileStore<OrganizationProfile> orgStore,
@@ -27,18 +18,41 @@ internal sealed class WorkUseCommandHandler(
     IWorkspaceContext context) : ICliHandler
 {
     /// <summary>
-    /// Executes 'workspace use' command asynchronously.
+    /// Selects and activates a workspace.
     /// </summary>
-    /// <param name="parseResult">Parsed CLI arguments.</param>
-    /// <param name="ct">Cancellation token.</param>
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
-        var orgName = parseResult.GetValue<string>("org");
-        var wsName = parseResult.GetValue<string>("name");
+        var orgName = parseResult.GetValue<string?>("org");
+        var wsName = parseResult.GetValue<string?>("name");
 
-        if (string.IsNullOrWhiteSpace(orgName) || string.IsNullOrWhiteSpace(wsName))
+        if (string.IsNullOrWhiteSpace(orgName))
         {
-            AnsiConsole.MarkupLine("[red]Organization name and workspace name are required[/]");
+            var organizations = (await orgStore.GetAllAsync(ct))
+                .OrderBy(org => org.Name)
+                .ToList();
+
+            if (organizations.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No organizations found.[/]");
+                return;
+            }
+
+            if (!AnsiConsole.Profile.Capabilities.Interactive)
+            {
+                AnsiConsole.MarkupLine("[red]Organization name is required in non-interactive terminals.[/]");
+                return;
+            }
+
+            orgName = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select organization")
+                    .PageSize(8)
+                    .AddChoices(organizations.Select(org => org.Name)));
+        }
+
+        if (string.IsNullOrWhiteSpace(orgName))
+        {
+            AnsiConsole.MarkupLine("[red]Organization name is required[/]");
             return;
         }
 
@@ -49,14 +63,40 @@ internal sealed class WorkUseCommandHandler(
             return;
         }
 
-        var allWorkspaces = await workspaceStore.GetAllAsync(ct);
-        var workspace = allWorkspaces.FirstOrDefault(w =>
-            w.OrganizationId == org.Id &&
-            w.Name.Equals(wsName, StringComparison.OrdinalIgnoreCase));
+        var allWorkspaces = (await workspaceStore.GetAllAsync(ct))
+            .Where(workspace => workspace.OrganizationId == org.Id)
+            .OrderBy(workspace => workspace.Name)
+            .ToList();
+
+        if (string.IsNullOrWhiteSpace(wsName))
+        {
+            if (allWorkspaces.Count == 0)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[yellow]No workspaces found in organization '{Markup.Escape(orgName)}'.[/]");
+                return;
+            }
+
+            if (!AnsiConsole.Profile.Capabilities.Interactive)
+            {
+                AnsiConsole.MarkupLine("[red]Workspace name is required in non-interactive terminals.[/]");
+                return;
+            }
+
+            wsName = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title($"Select workspace in {org.Name}")
+                    .PageSize(8)
+                    .AddChoices(allWorkspaces.Select(workspace => workspace.Name)));
+        }
+
+        var workspace = allWorkspaces.FirstOrDefault(workspace =>
+            workspace.Name.Equals(wsName, StringComparison.OrdinalIgnoreCase));
 
         if (workspace == null)
         {
-            AnsiConsole.MarkupLine($"[red]Workspace '{wsName}' not found in organization '{orgName}'[/]");
+            AnsiConsole.MarkupLine(
+                $"[red]Workspace '{wsName}' not found in organization '{orgName}'[/]");
             return;
         }
 
@@ -65,11 +105,11 @@ internal sealed class WorkUseCommandHandler(
     }
 
     /// <summary>
-    /// Displays confirmation panel indicating the workspace is now active.
+    /// Displays the activated workspace.
     /// </summary>
-    /// <param name="workspace">The <see cref="WorkspaceProfile"/> set as active.</param>
-    /// <param name="organization">The parent <see cref="OrganizationProfile"/>.</param>
-    private static void DisplayConfirmation(WorkspaceProfile workspace, OrganizationProfile organization)
+    private static void DisplayConfirmation(
+        WorkspaceProfile workspace,
+        OrganizationProfile organization)
     {
         var panel = new Panel(
                 $"[bold]Workspace:[/] {workspace.Name}\n" +

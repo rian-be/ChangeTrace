@@ -8,13 +8,13 @@ using Microsoft.Extensions.DependencyInjection;
 namespace ChangeTrace.Cli.Commands;
 
 /// <summary>
-/// Represents 'export' CLI command that exports a repository timeline to  JSON file.
+/// Represents 'export' CLI command that exports a repository timeline to a .gittrace file.
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
 /// <item>Implements <see cref="ICliCommand"/> to define the command structure and associate a handler.</item>
 /// <item>Registers itself as a singleton via <see cref="AutoRegisterAttribute"/>.</item>
-/// <item>Defines arguments and options for specifying the repository, output file, GitHub token, and verbosity.</item>
+/// <item>Defines arguments and options for specifying the repository, optional output file, GitHub token, and verbosity.</item>
 /// <item>The actual execution logic is handled by <see cref="ExportCommandHandler"/>.</item>
 /// </list>
 /// </remarks>
@@ -36,7 +36,10 @@ internal sealed class ExportCommand : ICliCommand
         var cmd = new Command("export", "Export repository timeline");
         
         var repoArg = new Argument<string>("repository")  {  Description = "Local path or HTTPS URL to Git repository" };
-        var outputOpt = new Option<string>("--output", "-o")  { Description = "Output JSON file path",  DefaultValueFactory = _ => "timeline.gittrace" };
+        var outputOpt = new Option<string?>("--output", "-o")
+        {
+            Description = "Explicit output .gittrace path. When omitted, export is saved under the active workspace."
+        };
         var tokenOpt = new Option<string?>("--token", "-r")  { Description = "GitHub personal access token" };
         var verboseOpt = new Option<bool>("--verbose", "-v") { Description = "Enable verbose logging" };
         

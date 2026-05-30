@@ -9,56 +9,69 @@ using Spectre.Console;
 namespace ChangeTrace.Cli.Handlers.Profiles.Workspaces;
 
 /// <summary>
-/// Handler for 'workspace list' CLI command.
+/// Lists workspaces for an organization or all organizations.
 /// </summary>
-/// <remarks>
-/// <list type="bullet">
-/// <item>Implements <see cref="ICliHandler"/> to list workspaces for an organization.</item>
-/// <item>Uses <see cref="IWorkspaceStore"/> to query workspaces by organization name.</item>
-/// <item>Outputs a formatted table with ID, name, and creation date.</item>
-/// <item>Displays a warning if no workspaces are found.</item>
-/// </list>
-/// </remarks>
 [AutoRegister(ServiceLifetime.Transient, typeof(WorkListCommandHandler))]
-internal sealed class WorkListCommandHandler(IWorkspaceStore store) : ICliHandler
+internal sealed class WorkListCommandHandler(
+    IWorkspaceStore store,
+    IProfileStore<OrganizationProfile> orgStore) : ICliHandler
 {
     /// <summary>
-    /// Executes 'workspace list' command asynchronously.
+    /// Displays available workspaces.
     /// </summary>
-    /// <param name="parseResult">Parsed CLI arguments.</param>
-    /// <param name="ct">Cancellation token.</param>
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
-        var orgName = parseResult.GetValue<string>("--org");
+        var orgName = parseResult.GetValue<string?>("--org");
 
         if (string.IsNullOrWhiteSpace(orgName))
         {
-            AnsiConsole.MarkupLine("[red]Error:[/] --org is required.");
+            await DisplayAllWorkspacesAsync(ct);
             return;
         }
 
-        await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse("green"))
-            .StartAsync("Loading workspaces...", async ctx =>
-            {
-                var workspaces = await store.GetByNameOrganization(orgName, ct);
-                var list = workspaces.ToList();
+        var workspaces = await store.GetByNameOrganization(orgName, ct);
+        var list = workspaces.ToList();
 
-                if (!list.Any())
-                {
-                    AnsiConsole.MarkupLine("[yellow] No workspaces found for this organization.[/]");
-                    return;
-                }
+        if (!list.Any())
+        {
+            AnsiConsole.MarkupLine("[yellow]No workspaces found for this organization.[/]");
+            return;
+        }
 
-                await Task.Delay(300, ct);
-
-                DisplayWorkspacesPanel(list, orgName);
-            });
+        DisplayWorkspacesPanel(list, orgName);
     }
 
-    
-    private static void DisplayWorkspacesPanel(IReadOnlyList<WorkspaceProfile> workspaces, string organizationName)
+    /// <summary>
+    /// Displays workspaces from all organizations.
+    /// </summary>
+    private async Task DisplayAllWorkspacesAsync(CancellationToken ct)
+    {
+        var organizations = (await orgStore.GetAllAsync(ct))
+            .ToDictionary(org => org.Id, org => org.Name);
+
+        var workspaces = (await store.GetAllAsync(ct))
+            .OrderBy(workspace =>
+                organizations.GetValueOrDefault(
+                    workspace.OrganizationId,
+                    workspace.OrganizationId.ToString()))
+            .ThenBy(workspace => workspace.Name)
+            .ToList();
+
+        if (workspaces.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]No workspaces found.[/]");
+            return;
+        }
+
+        DisplayAllWorkspacesPanel(workspaces, organizations);
+    }
+
+    /// <summary>
+    /// Renders workspaces for a single organization.
+    /// </summary>
+    private static void DisplayWorkspacesPanel(
+        IReadOnlyList<WorkspaceProfile> workspaces,
+        string organizationName)
     {
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -68,11 +81,46 @@ internal sealed class WorkListCommandHandler(IWorkspaceStore store) : ICliHandle
 
         foreach (var ws in workspaces)
         {
-            table.AddRow(ws.Id.ToString(), ws.Name, ws.CreatedAt.ToString("u"));
+            table.AddRow(
+                ws.Id.ToString(),
+                ws.Name,
+                ws.CreatedAt.ToString("u"));
         }
 
         var panel = new Panel(table)
             .Header($"[green]Workspaces for '{organizationName}'[/]")
+            .Border(BoxBorder.Rounded)
+            .BorderStyle(Color.Green)
+            .Padding(new Padding(1));
+
+        AnsiConsole.Write(panel);
+    }
+
+    /// <summary>
+    /// Renders workspaces grouped by organization.
+    /// </summary>
+    private static void DisplayAllWorkspacesPanel(
+        IReadOnlyList<WorkspaceProfile> workspaces,
+        IReadOnlyDictionary<Ulid, string> organizations)
+    {
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Organization")
+            .AddColumn("Workspace")
+            .AddColumn("Created At");
+
+        foreach (var ws in workspaces)
+        {
+            table.AddRow(
+                organizations.GetValueOrDefault(
+                    ws.OrganizationId,
+                    ws.OrganizationId.ToString()),
+                ws.Name,
+                ws.CreatedAt.ToString("u"));
+        }
+
+        var panel = new Panel(table)
+            .Header("[green]Workspaces[/]")
             .Border(BoxBorder.Rounded)
             .BorderStyle(Color.Green)
             .Padding(new Padding(1));
