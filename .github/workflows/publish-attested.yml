@@ -4,10 +4,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
   attestations: write
+  artifact-metadata: write
 
 jobs:
   publish:
     uses: ./.github/workflows/publish-artifacts.yml
+
+  release:
+    name: Upload artifacts to draft release
+    runs-on: ubuntu-latest
+    needs: publish
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download published artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: ChangeTrace-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update draft release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DIST_DIR: dist
+          FIND_DRAFT: "true"
+          ENSURE_DRAFT: "true"
+          FAIL_MESSAGE: "No draft release found. Release Drafter must create the draft before artifacts can be uploaded."
+          ASSET_PATTERNS: |
+            *
+        run: python3 -m scripts.releases.upload_release_assets

@@ -2,11 +2,13 @@ name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 tag-prefix: 'v'
 version-template: '$MAJOR.$MINOR.$PATCH'
+draft: true
+prerelease: false
 
 sort-by: merged_at
 sort-direction: descending
-pull-request-limit: 100
-history-limit: 100
+pull-request-limit: 25
+history-limit: 25
 
 no-changes-template: '- No changes.'
 no-contributors-template: 'No contributors.'
@@ -20,123 +22,91 @@ exclude-contributors:
   - dependabot
   - dependabot[bot]
 
-categories:
-  - type: pre-exclude
-    when:
-      labels:
-        - skip-changelog
-        - State One
-        - State Two
+exclude-labels:
+  - skip-changelog
+  - State One
+  - State Two
 
+categories:
   - title: 'Breaking Changes'
-    semver-increment: major
     collapse-after: -1
-    exclusive: true
-    when:
-      label: breaking-change
+    labels:
+      - breaking-change
 
   - title: 'Enhancements'
-    semver-increment: minor
     collapse-after: 10
-    exclusive: true
-    when:
-      label: enhancement
+    labels:
+      - enhancement
 
   - title: 'Fixes'
-    semver-increment: patch
     collapse-after: 10
-    exclusive: true
-    when:
-      label: bug
+    labels:
+      - bug
 
   - title: 'Performance'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: Performance
+    labels:
+      - Performance
 
   - title: 'Architecture'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: Architecture
+    labels:
+      - Architecture
 
   - title: 'Renderer'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: Renderer
+    labels:
+      - Renderer
 
   - title: 'Gpu'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: Gpu
+    labels:
+      - Gpu
 
   - title: 'Layout'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: Layout
+    labels:
+      - Layout
 
   - title: 'Tests'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: tests
+    labels:
+      - tests
 
   - title: 'Documentation'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: documentation
+    labels:
+      - documentation
 
   - title: 'CI'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: ci
+    labels:
+      - ci
 
   - title: 'Tasks'
-    semver-increment: patch
     collapse-after: 8
-    exclusive: true
-    when:
-      label: task
+    labels:
+      - task
 
   - title: 'Other Changes'
-    semver-increment: patch
     collapse-after: 8
 
-  - type: version-resolver
-    semver-increment: major
-    when:
-      label: breaking-change
-
-  - type: version-resolver
-    semver-increment: minor
-    when:
-      label: enhancement
-
-  - type: version-resolver
-    semver-increment: patch
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+      - enhancement
+  patch:
+    labels:
+      - bug
+  default: patch
 
 template: |
   $CHANGES
 
 footer: |
-  ## Contributors
-
-  $CONTRIBUTORS
-
   ## Links
 
   - Full changelog: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
