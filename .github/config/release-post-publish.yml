@@ -1,0 +1,33 @@
+discord:
+  color: 5814783
+  release:
+    title_template: "New release: %{name}"
+    manual_title: "Manual workflow run completed"
+    messages:
+      - "A new ChangeTrace release is live. Grab the latest build below."
+      - "Fresh ChangeTrace binaries just landed. Check the release and download the latest ZIPs."
+      - "ChangeTrace has a new release. Full details and downloads are available below."
+      - "Another ChangeTrace version is out. Pick up the latest build from this release."
+      - "The latest ChangeTrace release is now available. See the release page for details."
+      - "A fresh ChangeTrace build just shipped. Download the newest release below."
+      - "ChangeTrace just rolled out a new version. The latest artifacts are ready below."
+      - "New ChangeTrace release published. Open the release page for details and downloads."
+    fields:
+      tag: "Tag"
+      release_type: "Release type"
+      published_at: "Published at"
+      target: "Target"
+      published_by: "Published by"
+      platforms: "Platforms"
+      uploaded_zips: "Uploaded ZIPs"
+      verification: "Verification"
+    verification_text: "Sigstore bundles are available in the GitHub release assets."
+  changelog:
+    title_template: "Changelog for %{tag}"
+    max_length: 3900
+    truncated_suffix: "...[truncated in Discord, see full release notes on GitHub]"
+assets:
+  include_glob: "ChangeTrace-*.zip"
+  remove_globs:
+    - "*.sigstore.json"
+    - "*arm*.zip"

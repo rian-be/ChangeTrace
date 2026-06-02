@@ -39,27 +39,12 @@ jobs:
 
       - name: Resolve release metadata
         id: meta
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_NAME="${{ inputs.tag_name }}"
-            RELEASE_NAME="${{ inputs.release_name }}"
-          else
-            TAG_NAME="${GITHUB_REF_NAME}"
-            RELEASE_NAME=""
-          fi
-
-          if [ -z "$RELEASE_NAME" ]; then
-            RELEASE_NAME="$TAG_NAME"
-          fi
-
-          if ! echo "$TAG_NAME" | grep -Eq '^v[0-9]+(\.[0-9]+){1,2}-(pre|alpha|beta|rc)(\.[0-9]+)?$'; then
-            echo "Tag must be a pre-release tag like v0.62.24-pre.1, v0.62.24-alpha.1, v0.62.24-beta.1, or v0.62.24-rc.1"
-            exit 1
-          fi
-
-          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
-          echo "release_version=${TAG_NAME#v}" >> "$GITHUB_OUTPUT"
-          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: python3 -m scripts.releases.prepare_prerelease
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -88,7 +73,11 @@ jobs:
 
       - name: Upload pre-release assets
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
-        run: |
-          gh release upload "$TAG_NAME" dist/ChangeTrace-*.zip dist/SHA256SUMS.txt --clobber
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag_name }}
+          DIST_DIR: dist
+          ASSET_PATTERNS: |
+            ChangeTrace-*.zip
+            SHA256SUMS.txt
+        run: python3 -m scripts.releases.upload_release_assets
