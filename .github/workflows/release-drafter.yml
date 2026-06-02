@@ -2,21 +2,68 @@ name: Release Drafter
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the leading "v"
+        required: false
+        type: string
   push:
     branches: [ main ]
 
 permissions:
   contents: write
   pull-requests: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   update-release-draft:
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.release_drafter.outputs.tag_name }}
+      html_url: ${{ steps.release_drafter.outputs.html_url }}
 
     steps:
       - name: Update release draft
+        id: release_drafter
         uses: release-drafter/release-drafter@v7
         with:
           config-name: release-drafter.yml
+          version: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: update-release-draft
+    uses: ./.github/workflows/publish-artifacts.yml
+
+  upload-release-assets:
+    name: Upload artifacts to release draft
+    runs-on: ubuntu-latest
+    needs:
+      - update-release-draft
+      - publish
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download published artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: ChangeTrace-*
+          path: dist
+          merge-multiple: true
+
+      - name: Upload assets to Release Drafter draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.update-release-draft.outputs.tag_name }}
+          DIST_DIR: dist
+          ENSURE_DRAFT: "true"
+          FAIL_MESSAGE: "Release Drafter did not return a tag name."
+          ASSET_PATTERNS: |
+            *
+        run: python3 -m scripts.releases.upload_release_assets

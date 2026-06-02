@@ -6,6 +6,10 @@ on:
       - "Tools/**"
 
   push:
+    branches:
+      - main
+      - master
+      - develop
     paths:
       - "Tools/**"
 

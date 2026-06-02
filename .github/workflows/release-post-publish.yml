@@ -1,0 +1,70 @@
+name: Release Post Publish
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Publish changelog and notify Discord
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.release.prerelease }}
+    env:
+      RELEASE_POST_PUBLISH_CONFIG: .github/config/release-post-publish.yml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download release assets
+        if: ${{ github.event_name == 'release' }}
+        shell: bash
+        env:
+          CONFIG_PATH: ${{ env.RELEASE_POST_PUBLISH_CONFIG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          ASSETS_DIR: release-assets
+        run: python3 -m scripts.release_post_publish.prepare_assets
+
+      - name: Send Discord release notification
+        shell: bash
+        env:
+          WEBHOOK_URL: ${{ secrets.CHANGETRACE_RELEASE_WEBHOOK }}
+          CONFIG_PATH: ${{ env.RELEASE_POST_PUBLISH_CONFIG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_TARGET: ${{ github.event.release.target_commitish }}
+          RELEASE_AUTHOR: ${{ github.event.release.author.login }}
+          RELEASE_PUBLISHED_AT: ${{ github.event.release.published_at }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+          ASSETS_DIR: release-assets
+        run: python3 -m scripts.release_post_publish.send_release
+
+      - name: Publish changelog to Discord
+        if: ${{ github.event_name == 'release' }}
+        shell: bash
+        env:
+          WEBHOOK_URL: ${{ secrets.CHANGETRACE_PUBLISH_CHANGELOG_WEBHOOK_URL }}
+          CONFIG_PATH: ${{ env.RELEASE_POST_PUBLISH_CONFIG }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: python3 -m scripts.release_post_publish.send_changelog
+
+      - name: Upload release assets to Discord
+        if: ${{ github.event_name == 'release' }}
+        uses: sinshutu/upload-to-discord@v2.0.0
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.CHANGETRACE_RELEASE_WEBHOOK }}
+        with:
+          args: release-assets/*.zip
