@@ -80,3 +80,10 @@ def require_env(*names: str) -> list[str]:
 def env_flag(name: str) -> bool:
     """Interpret an environment variable as a boolean workflow flag."""
     return os.environ.get(name, "").lower() == "true"
+
+
+def format_template(template: str, **values: str) -> str:
+    """Format simple %{key} workflow templates with named values."""
+    for key, value in values.items():
+        template = template.replace(f"%{{{key}}}", value)
+    return template

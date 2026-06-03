@@ -17,7 +17,7 @@ namespace ChangeTrace.GIt.Services;
 /// This class handles the full lifecycle of timeline storage:
 /// <list type="bullet">
 /// <item>Automatically appends the <c>.gittrace</c> extension when saving or loading files.</item>
-/// <item>Delegates serialization to <see cref="ITimelineSerializer"/>.</item>
+/// <item>Delegates serialization to <see cref="ISerializer{T}"/> for <see cref="Timeline"/>.</item>
 /// <item>Delegates file I/O to <see cref="IFileManager"/>.</item>
 /// <item>Returns <see cref="Result"/> or <see cref="Result{T}"/> objects to encapsulate success or failure without throwing exceptions.</item>
 /// <item>Designed as a singleton service for dependency injection with <see cref="ServiceLifetime.Singleton"/>.</item>
@@ -26,7 +26,7 @@ namespace ChangeTrace.GIt.Services;
 [AutoRegister(ServiceLifetime.Singleton)]
 internal sealed class TimelineRepositoryMsgPack(
     ILogger<TimelineRepositoryMsgPack> logger,
-    ITimelineSerializer serializer,
+    ISerializer<Timeline> serializer,
     IFileManager fileManager)
     : ITimelineRepository
 {

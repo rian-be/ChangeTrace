@@ -2,9 +2,10 @@ using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Diagnostics;
+using ChangeTrace.Core.Interfaces;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.CredentialTrace.Interfaces;
 using ChangeTrace.CredentialTrace.Profiles;
-using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.Graphics.Window;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
@@ -22,7 +23,7 @@ internal sealed class WorkPlayCommandHandler(
     IWorkspaceTimelineStorage timelineStorage,
     IProfileStore<OrganizationProfile> orgStore,
     IProfileStore<WorkspaceProfile> workspaceStore,
-    ITimelineSerializer serializer,
+    ISerializer<Timeline> serializer,
     ITimelinePlayerFactory playerFactory,
     IRenderSystemFactory renderFactory,
     IDiagnosticsProvider diagnostics) : ICliHandler

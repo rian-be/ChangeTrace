@@ -3,15 +3,13 @@
 
 import os
 
-from scripts.workflow_utils import env, load_config, post_json, require_env
-
+from scripts.workflow_utils import env, format_template, load_config, post_json, require_env
 
 def truncate_body(body: str, max_length: int, suffix: str) -> str:
     """Trim long changelog text to fit Discord embed limits."""
     if len(body) <= max_length:
         return body
     return body[:max_length] + "\n\n" + suffix
-
 
 def main() -> int:
     """Build and post the changelog embed for the current release."""
@@ -29,7 +27,7 @@ def main() -> int:
     payload = {
         "embeds": [
             {
-                "title": changelog_cfg["title_template"] % {"tag": release_tag},
+                "title": format_template(changelog_cfg["title_template"], tag=release_tag),
                 "url": release_url,
                 "color": color,
                 "description": body,
@@ -39,7 +37,6 @@ def main() -> int:
 
     post_json(webhook_url, payload)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
