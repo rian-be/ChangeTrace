@@ -1,8 +1,8 @@
 # ChangeTrace Benchmarks
 
-ChangeTrace Benchmarks contains repeatable BenchmarkDotNet scenarios for performance-sensitive CPU paths.
+ChangeTrace Benchmarks contains repeatable BenchmarkDotNet scenarios for performance sensitive CPU paths.
 
-The benchmark project exists to measure the CPU side render pipeline before OpenGL/GPU execution. It focuses on timeline event translation, layout computation, render state assembly, scene snapshot generation, visibility planning, frame preparation, and GPU buffer data preparation.
+The benchmark project exists to measure performance sensitive CPU paths before deeper optimization work. It covers Core timeline construction, timeline serialization, semantic aggregation, Git repository reading, export orchestration, and the CPU side render pipeline before OpenGL/GPU execution.
 
 > [!IMPORTANT]
 > These benchmarks are for local performance investigation and regression checks. They are not part of the normal application runtime.
@@ -10,7 +10,7 @@ The benchmark project exists to measure the CPU side render pipeline before Open
 > [!WARNING]
 > Benchmark results depend on hardware, runtime version, operating system scheduling, power mode, and background processes. Compare results from the same machine and environment when possible.
 
-Use it when you want a repeatable way to check whether render pipeline changes affect CPU time, managed allocations, or scaling with larger timelines.
+Use it when you want a repeatable way to check whether Core, Git, export, player, or render pipeline changes affect CPU time, managed allocations, or scaling with larger timelines.
 
 The usual flow is simple:
 
@@ -23,6 +23,13 @@ The usual flow is simple:
 
 The benchmark suite currently covers:
 
+- timeline construction from commit data
+- timeline MessagePack serialization and deserialization
+- timeline normalization asregression check
+- semantic trace event aggregation
+- file coupling pair generation
+- local Git repository reading with and without file changes
+- export orchestration without clone, network, or file persistence
 - semantic render event translation from timeline events
 - hive layout computation and animated convergence
 - render state assembly from timeline events
@@ -34,7 +41,7 @@ The benchmark suite currently covers:
 
 Additional player benchmarks are available for playback cursor, seek, stepper, and player factory costs. They are kept in the same benchmark project, but the primary suite tracks issue #17 and the CPU side render pipeline.
 
-The benchmarks intentionally avoid opening OpenTK windows or requiring GPU access.
+The benchmarks intentionally avoid opening OpenTK windows or requiring GPU access. Git reader benchmarks create local synthetic repositories and do not access the network.
 
 ## Commands
 
@@ -42,6 +49,48 @@ Run all benchmarks:
 
 ```bash
 dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*Benchmarks*"
+```
+
+Run Core timeline benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*Core*"
+```
+
+Run timeline builder benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*TimelineBuilderBenchmarks*"
+```
+
+Run timeline serialization benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*TimelineSerializationBenchmarks*"
+```
+
+Run trace event aggregation benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*TraceEventAggregationBenchmarks*"
+```
+
+Run file coupling benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*FileCouplingAggregatorBenchmarks*"
+```
+
+Run Git reader benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*GitRepositoryReaderBenchmarks*"
+```
+
+Run export orchestration benchmarks:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*RepositoryExporterBenchmarks*"
 ```
 
 Run the full CPU-side render pipeline suite:
@@ -80,6 +129,12 @@ Run one benchmark group with a shorter sanity check:
 dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*RenderStateAssemblyBenchmarks*" --warmupCount 1 --iterationCount 3
 ```
 
+Run one Core benchmark group with a shorter sanity check:
+
+```bash
+dotnet run -c Release --project Benchmarks/ChangeTrace.Benchmarks.csproj -- --filter "*TimelineBuilderBenchmarks*" --warmupCount 1 --iterationCount 3
+```
+
 Run one player benchmark group with a shorter sanity check:
 
 ```bash
@@ -96,6 +151,10 @@ task benchmark
 
 The benchmark project is split by measured subsystem:
 
+- `Core/Benchmarks` contains timeline, serialization, normalization, and aggregation benchmark entry points
+- `Core/Fixtures` contains shared deterministic Core benchmark data setup
+- `GIt/Benchmarks` contains Git reader and export orchestration benchmark entry points
+- `GIt/Fixtures` contains local synthetic repository setup for Git reader benchmarks
 - `Rendering/Benchmarks` contains render pipeline benchmark entry points
 - `Rendering/Fixtures` contains shared render benchmark data setup
 - `Rendering/Gpu` contains CPU-side GPU data preparation benchmarks
@@ -113,6 +172,17 @@ The render benchmark suite maps to issue #17:
 - render state and scene snapshot assembly benchmarks
 - CPU-side GPU buffer data preparation benchmark
 - local run commands outside the normal application build flow
+
+The Core and Git benchmark suite maps to the current export scalability work:
+
+- synthetic commit inputs at `1k`, `10k`, and `100k` sizes
+- file-change density checks at `1`, `4`, and `12` files per commit
+- timeline construction with commits only, file changes, and full event generation
+- MessagePack `.gittrace` serialization and deserialization costs
+- semantic aggregation overhead before downstream consumers
+- file coupling pair generation for large commits
+- LibGit2Sharp read costs with and without file changes
+- export orchestration cost without clone, network, or file persistence
 
 ## Reports
 

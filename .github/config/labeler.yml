@@ -23,6 +23,11 @@ tests:
           - Tests/**
           - '**/*Tests.cs'
 
+Benchmark:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Benchmarks/**
+
 documentation:
   - changed-files:
       - any-glob-to-any-file:

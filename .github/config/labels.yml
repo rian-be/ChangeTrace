@@ -42,6 +42,10 @@
   color: "0e4d92"
   description: Performance improvements or regressions
 
+- name: Benchmark
+  color: "5319e7"
+  description: Benchmark coverage and performance measurement changes
+
 - name: breaking-change
   color: "b60205"
   description: Introduces a breaking change
