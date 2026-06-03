@@ -33,6 +33,11 @@ internal sealed class DebugWindow(
 {
     private const int MaxHistory = 50;
 
+    static DebugWindow()
+    {
+        GLFWProvider.CheckForMainThread = false;
+    }
+
     private enum DebugTab
     {
         Engine,

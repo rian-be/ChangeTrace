@@ -1,6 +1,7 @@
 using ChangeTrace.Configuration.Converters;
 using ChangeTrace.Configuration.Discovery;
 using MessagePack;
+using MessagePack.Formatters;
 using MessagePack.Resolvers;
 using ChangeTrace.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,14 +28,16 @@ internal sealed class MessagePackSerializer<T> : ISerializer<T>
     /// <summary>
     /// Initializes serializer with <see cref="UlidFormatter"/> and standard resolvers.
     /// </summary>
-    public MessagePackSerializer()
+    public MessagePackSerializer(IEnumerable<IMessagePackFormatter<T>> formatters)
     {
         var resolver = CompositeResolver.Create(
-            [new UlidFormatter()],
-            [StandardResolver.Instance]
+            formatters.Cast<IMessagePackFormatter>().Append(new UlidFormatter()).ToArray(),
+            [StandardResolverAllowPrivate.Instance]
         );
 
-        _options = MessagePackSerializerOptions.Standard.WithResolver(resolver);
+        _options = MessagePackSerializerOptions.Standard
+            .WithCompression(MessagePackCompression.Lz4BlockArray)
+            .WithResolver(resolver);
     }
 
     /// <summary>

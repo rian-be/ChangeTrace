@@ -20,6 +20,11 @@ namespace ChangeTrace.Graphics.Window;
 /// </summary>
 internal sealed class PlayerWindow : GameWindow
 {
+    static PlayerWindow()
+    {
+        GLFWProvider.CheckForMainThread = false;
+    }
+
     private readonly Timeline _timeline;
 
     private readonly ITimelinePlayerFactory _playerFactory;

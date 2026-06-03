@@ -3,9 +3,10 @@ using System.Text.Json;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Diagnostics;
+using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Specifications.Queries;
 using ChangeTrace.Core.Specifications.Queries.Commits;
-using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.Graphics.Window;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
@@ -19,7 +20,7 @@ namespace ChangeTrace.Cli.Handlers;
 /// </summary>
 [AutoRegister(ServiceLifetime.Transient, typeof(ShowTimelineCommandHandler))]
 internal sealed class ShowTimelineCommandHandler(
-    ITimelineSerializer serializer,
+    ISerializer<Timeline> serializer,
     ITimelinePlayerFactory playerFactory,
     IRenderSystemFactory renderFactory,
     IDiagnosticsProvider diagnostics): ICliHandler

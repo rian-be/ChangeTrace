@@ -5,8 +5,7 @@ import glob
 import hashlib
 import os
 
-from scripts.workflow_utils import env, env_flag, gh, load_config, post_json, require_env
-
+from scripts.workflow_utils import env, env_flag, format_template, gh, load_config, post_json, require_env
 
 def fetch_previous_tag(repository: str, github_token: str) -> str:
     """Fetch the previous release tag to avoid repeating the same message variant."""
@@ -21,7 +20,6 @@ def fetch_previous_tag(repository: str, github_token: str) -> str:
     )
     return result.stdout.strip() if result.returncode == 0 else ""
 
-
 def choose_message(messages: list[str], release_tag: str, previous_tag: str) -> str:
     """Pick a deterministic message variant and avoid repeating the previous one."""
     if not messages:
@@ -34,13 +32,11 @@ def choose_message(messages: list[str], release_tag: str, previous_tag: str) -> 
             current_index = (current_index + 1) % len(messages)
     return messages[current_index]
 
-
 def collect_platforms(assets_dir: str, include_glob: str) -> tuple[list[str], str]:
     """Collect uploaded ZIP assets and derive a platform summary from their names."""
     asset_paths = sorted(glob.glob(os.path.join(assets_dir, include_glob)))
     platforms = [os.path.basename(path)[len("ChangeTrace-") : -len(".zip")] for path in asset_paths]
     return asset_paths, (", ".join(platforms) if platforms else "unknown")
-
 
 def main() -> int:
     """Send either the release embed or the manual-run placeholder message."""
@@ -71,7 +67,7 @@ def main() -> int:
 
     release_type = "prerelease" if env_flag("RELEASE_PRERELEASE") else "stable"
     release_name = env("RELEASE_NAME") or release_tag
-    title = release_cfg["title_template"] % {"name": release_name}
+    title = format_template(release_cfg["title_template"], name=release_name)
     fields_cfg = release_cfg["fields"]
 
     payload = {
@@ -97,7 +93,6 @@ def main() -> int:
 
     post_json(webhook_url, payload)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

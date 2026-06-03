@@ -2,7 +2,8 @@ using System.CommandLine;
 using ChangeTrace.Cli.Commands.Debug;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
-using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.Core.Interfaces;
+using ChangeTrace.Core.Timelines;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering;
 using ChangeTrace.Rendering.Factory;
@@ -12,7 +13,7 @@ namespace ChangeTrace.Cli.Handlers.Debug;
 
 [AutoRegister(ServiceLifetime.Transient, typeof(RenderDebugCommandHandler))]
 internal sealed class RenderDebugCommandHandler(
-    ITimelineSerializer serializer,
+    ISerializer<Timeline> serializer,
     ITimelinePlayerFactory playerFactory,
     IRenderSystemFactory renderFactory,
     Core.Diagnostics.IDiagnosticsProvider diagnostics): ICliHandler
