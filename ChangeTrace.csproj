@@ -14,8 +14,8 @@
         <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
         <PublishRepositoryUrl>false</PublishRepositoryUrl>
         
-        <!-- Exclude tools folder -->
-        <DefaultItemExcludes>$(DefaultItemExcludes);Tools/**;Benchmarks/**</DefaultItemExcludes>
+        <!-- Exclude sibling projects -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);Tools/**;Benchmarks/**;Tests/**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
@@ -24,6 +24,12 @@
       <Folder Include="publish\" />
       <Folder Include="src\Core\Specifications\Filters\Merge\" />
       <Folder Include="src\Graphics\Rendering\Meshes\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+        <_Parameter1>ChangeTrace.Tests</_Parameter1>
+      </AssemblyAttribute>
     </ItemGroup>
 
     <ItemGroup>
