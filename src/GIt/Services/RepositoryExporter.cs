@@ -54,27 +54,25 @@ internal sealed class RepositoryExporter(
 
             var repoPath = pathResult.Value;
             progress?.Invoke("Prepare", 1, 4, "Repository ready");
-            
-            var repositoryId = ExtractRepositoryId(pathOrUrl);
-            // Step 2: Read commits
-            var commitsResult = await ReadCommitsStep(repoPath, options, progress, cancellationToken);
-            if (commitsResult.IsFailure)
-                return Result<Timeline>.Failure(commitsResult.Error!);
 
-            var commits = commitsResult.Value;
-            
-            // Step 3: Build timeline
-            var timelineResult = BuildTimelineStep(commits, repositoryId, options, progress);
+            var repositoryId = ExtractRepositoryId(pathOrUrl);
+            // Step 2 and 3: Stream commits and build timeline.
+            var timelineResult = await BuildTimelineFromRepositoryStep(
+                repoPath,
+                repositoryId,
+                options,
+                progress,
+                cancellationToken);
             if (timelineResult.IsFailure)
                 return Result<Timeline>.Failure(timelineResult.Error!);
-            
+
             var timeline = timelineResult.Value;
             progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
 
             // Step 4 and 5 Enrich with PR data & Normalize
             //await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
-            TimelineNormalizer.Normalize(timeline); 
-            
+            TimelineNormalizer.Normalize(timeline);
+
             progress?.Invoke("Complete", 4, 4, "Export complete");
 
             return Result<Timeline>.Success(timeline);
@@ -106,7 +104,7 @@ internal sealed class RepositoryExporter(
         CancellationToken cancellationToken = default)
     {
         var exportResult = await ExportAsync(pathOrUrl, options, progress, cancellationToken);
-        
+
         if (exportResult.IsFailure)
             return Result.Failure(exportResult.Error!);
 
@@ -139,7 +137,7 @@ internal sealed class RepositoryExporter(
         if (IsGitUrl(pathOrUrl))
         {
             logger.LogInformation("Cloning repository: {Url}", pathOrUrl);
-            
+
             var tempPath = Path.Combine(Path.GetTempPath(), "ChangeTrace", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempPath);
 
@@ -154,56 +152,34 @@ internal sealed class RepositoryExporter(
             : Result<string>.Success(pathOrUrl);
     }
 
-    /// <summary>
-    /// Reads commits from  repository path using <see cref="IGitRepositoryReader"/>.
-    /// </summary>
-    /// <param name="repoPath">Local repository path.</param>
-    /// <param name="options">Export options controlling commit selection.</param>
-    /// <param name="progress">Optional progress callback to report read progress.</param>
-    /// <param name="ct">Cancellation token.</param>
-    private async Task<Result<IReadOnlyList<CommitData>>> ReadCommitsStep(
+    private async Task<Result<Timeline>> BuildTimelineFromRepositoryStep(
         string repoPath,
+        RepositoryId? repositoryId,
         ExportOptions options,
         ProgressCallback? progress,
         CancellationToken ct)
     {
         progress?.Invoke("Read", 1, 4, "Reading commits...");
-        
-        var commitsResult = await gitReader.ReadCommitsAsync(
+
+        var backend = SelectHistoryBackend(repoPath, options);
+
+        var commitsResult = await gitReader.ReadCommitsStreamAsync(
             repoPath,
             new GitReaderOptions(
                 IncludeFileChanges: options.IncludeFileChanges,
                 MaxCommits: options.MaxCommits,
                 StartDate: options.StartDate,
-                EndDate: options.EndDate
+                EndDate: options.EndDate,
+                Backend: backend,
+                DetectRenames: options.DetectRenames,
+                IncludeBranches: options.IncludeBranchEvents || options.IncludeMergeDetection
             ),
             ct
         );
 
-        if (commitsResult.IsFailure) return commitsResult;
+        if (commitsResult.IsFailure)
+            return Result<Timeline>.Failure(commitsResult.Error!);
 
-        var commits = commitsResult.Value;
-        progress?.Invoke("Read", 2, 4, $"Read {commits.Count} commits");
-
-        return Result<IReadOnlyList<CommitData>>.Success(commits);
-    }
-
-    /// <summary>
-    /// Builds timeline from list of commits using <see cref="ITimelineBuilder"/>.
-    /// </summary>
-    /// <param name="commits">List of commits to build timeline from.</param>
-    /// <param name="repositoryId"></param>
-    /// <param name="options">Export options influencing timeline construction.</param>
-    /// <param name="progress">Optional progress callback.</param>
-    /// <returns>
-    /// A <see cref="Result{Timeline}"/> containing the built timeline or error.
-    /// </returns>
-    private Result<Timeline> BuildTimelineStep(
-        IReadOnlyList<CommitData> commits, 
-        RepositoryId repositoryId,
-        ExportOptions options,
-        ProgressCallback? progress)
-    {
         progress?.Invoke("Build", 2, 4, "Building timeline...");
 
         var builderOptions = new TimelineBuilderOptions(
@@ -212,10 +188,39 @@ internal sealed class RepositoryExporter(
             IncludeMergeDetection: options.IncludeMergeDetection,
             RepositoryId: repositoryId
         );
-  
-        return timelineBuilder.Build(commits, builderOptions);
+
+        return await timelineBuilder.BuildAsync(commitsResult.Value, builderOptions, ct);
     }
-    
+
+    private GitHistoryReaderBackend SelectHistoryBackend(
+        string repoPath,
+        ExportOptions options)
+    {
+        if (options.HistoryBackend != GitHistoryReaderBackend.LibGit2Sharp)
+            return options.HistoryBackend;
+
+        if (!IsGitCliAvailable())
+            return GitHistoryReaderBackend.LibGit2Sharp;
+
+        if (options.IncludeFileChanges)
+        {
+            logger.LogInformation(
+                "IncludeFileChanges enabled. Automatically switching to Git CLI history backend for file change extraction throughput.");
+            return GitHistoryReaderBackend.GitCli;
+        }
+
+        var commitCount = GetCommitCount(repoPath);
+        if (commitCount > 20000)
+        {
+            logger.LogWarning(
+                "Large repository detected ({Count} commits). Automatically switching to Git CLI streaming backend for performance.",
+                commitCount);
+            return GitHistoryReaderBackend.GitCli;
+        }
+
+        return GitHistoryReaderBackend.LibGit2Sharp;
+    }
+
     /// <summary>
     /// Enriches timeline with pull request data using <see cref="ITimelineEnricher"/>.
     /// </summary>
@@ -246,7 +251,7 @@ internal sealed class RepositoryExporter(
         else
             logger.LogWarning("PR enrichment failed: {Error}", enrichResult.Error);
     }
-    
+
     /// <summary>
     /// Determines if a string is a Git URL.
     /// </summary>
@@ -255,7 +260,7 @@ internal sealed class RepositoryExporter(
     private static bool IsGitUrl(string pathOrUrl) =>
          pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
                pathOrUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase);
-    
+
     /// <summary>
     /// Extracts repository owner and name from Git URL.
     /// </summary>
@@ -288,5 +293,68 @@ internal sealed class RepositoryExporter(
         }
 
         return null;
+    }
+
+    private static bool IsGitCliAvailable()
+    {
+        try
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "git",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.StartInfo.ArgumentList.Add("--version");
+            process.Start();
+            process.WaitForExit();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static int GetCommitCount(string repoPath)
+    {
+        try
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "git",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.StartInfo.ArgumentList.Add("-C");
+            process.StartInfo.ArgumentList.Add(repoPath);
+            process.StartInfo.ArgumentList.Add("rev-list");
+            process.StartInfo.ArgumentList.Add("--count");
+            process.StartInfo.ArgumentList.Add("HEAD");
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode == 0 && int.TryParse(output.Trim(), out var count))
+                return count;
+        }
+        catch
+        {
+            // Ignore
+        }
+
+        return 0;
     }
 }

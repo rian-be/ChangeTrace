@@ -11,6 +11,7 @@ namespace ChangeTrace.GIt.Options;
 /// </summary>
 /// <param name="IncludeFileChanges">
 /// Whether to include detailed file-level changes for commits. Defaults to <c>true</c>.
+/// This is one of the main export cost drivers on large repositories.
 /// </param>
 /// <param name="IncludeBranchEvents">
 /// Whether to generate branch-related events in the timeline. Defaults to <c>true</c>.
@@ -40,6 +41,16 @@ internal sealed record ExportOptions
     public bool IncludeBranchEvents { get; init; } = true;
     public bool IncludeMergeDetection { get; init; } = true;
     public bool EnrichWithPullRequests { get; init; } = true;
+    /// <summary>
+    /// History backend used for commit and file-change extraction.
+    /// <see cref="GitHistoryReaderBackend.GitCli"/> is usually the better choice for larger local histories.
+    /// </summary>
+    public GitHistoryReaderBackend HistoryBackend { get; init; } = GitHistoryReaderBackend.LibGit2Sharp;
+    /// <summary>
+    /// Controls rename detection for Git CLI file change extraction.
+    /// Disabling it improves throughput but reports renames as delete/add pairs.
+    /// </summary>
+    public bool DetectRenames { get; init; } = true;
     public int MaxCommits { get; init; } = 0;
     public DateTimeOffset? StartDate { get; init; }
     public DateTimeOffset? EndDate { get; init; }

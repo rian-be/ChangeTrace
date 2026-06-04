@@ -27,6 +27,8 @@ permissions:
 jobs:
   publish:
     uses: ./.github/workflows/publish-artifacts.yml
+    with:
+      package_version: ${{ inputs.tag_name || github.ref_name }}
 
   release:
     name: Create GitHub pre-release
@@ -55,7 +57,7 @@ jobs:
       - name: Create checksums
         run: |
           cd dist
-          sha256sum ChangeTrace-*.zip > SHA256SUMS.txt
+          sha256sum ChangeTrace-*.zip ChangeTrace*.nupkg > SHA256SUMS.txt
 
       - name: Draft pre-release notes
         uses: release-drafter/release-drafter@v7
@@ -79,5 +81,6 @@ jobs:
           DIST_DIR: dist
           ASSET_PATTERNS: |
             ChangeTrace-*.zip
+            ChangeTrace*.nupkg
             SHA256SUMS.txt
         run: python3 -m scripts.releases.upload_release_assets

@@ -42,19 +42,7 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
 
             foreach (var commit in commits)
             {
-                AddCommitEvent(timeline, commit);
-                if (options.IncludeFileChanges)
-                {
-                    AddFileChangeEvents(timeline, commit);
-                }
-                if (options.IncludeBranchEvents)
-                {
-                    AddBranchEvents(timeline, commit, branchTracker);
-                }
-                if (options.IncludeMergeDetection && commit.IsMerge)
-                {
-                    AddMergeEvent(timeline, commit);
-                }
+                AddCommitToTimeline(timeline, commit, options, branchTracker);
             }
             
             return Result<Timeline>.Success(timeline);
@@ -63,6 +51,60 @@ internal sealed class TimelineBuilder(ILogger<TimelineBuilder> logger) : ITimeli
         {
             logger.LogError(ex, "Failed to build timeline");
             return Result<Timeline>.Failure("Failed to build timeline", ex);
+        }
+    }
+
+    public async Task<Result<Timeline>> BuildAsync(
+        IAsyncEnumerable<CommitData> commits,
+        TimelineBuilderOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            logger.LogInformation("Building timeline from commit stream");
+
+            var timeline = new Timeline(options.RepositoryId);
+            var branchTracker = new BranchTracker();
+            var count = 0;
+
+            await foreach (var commit in commits.WithCancellation(cancellationToken))
+            {
+                AddCommitToTimeline(timeline, commit, options, branchTracker);
+                count++;
+                if (count % 50000 == 0)
+                {
+                    logger.LogInformation("Processed {Count} commits...", count);
+                }
+            }
+
+            logger.LogInformation("Built timeline from {Count} streamed commits", count);
+            return Result<Timeline>.Success(timeline);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to build timeline from commit stream");
+            return Result<Timeline>.Failure("Failed to build timeline", ex);
+        }
+    }
+
+    private static void AddCommitToTimeline(
+        Timeline timeline,
+        CommitData commit,
+        TimelineBuilderOptions options,
+        BranchTracker branchTracker)
+    {
+        AddCommitEvent(timeline, commit);
+        if (options.IncludeFileChanges)
+        {
+            AddFileChangeEvents(timeline, commit);
+        }
+        if (options.IncludeBranchEvents)
+        {
+            AddBranchEvents(timeline, commit, branchTracker);
+        }
+        if (options.IncludeMergeDetection && commit.IsMerge)
+        {
+            AddMergeEvent(timeline, commit);
         }
     }
     

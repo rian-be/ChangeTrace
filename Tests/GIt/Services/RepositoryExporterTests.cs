@@ -8,6 +8,7 @@ using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 using Xunit;
 
 namespace ChangeTrace.Tests.GIt.Services;
@@ -43,7 +44,9 @@ public sealed class RepositoryExporterTests
         Assert.Equal(5, reader.ReadOptions?.MaxCommits);
         Assert.Equal(options.StartDate, reader.ReadOptions?.StartDate);
         Assert.Equal(options.EndDate, reader.ReadOptions?.EndDate);
-        Assert.Same(reader.CommitsToReturn, builder.Commits);
+        Assert.Equal(GitHistoryReaderBackend.LibGit2Sharp, reader.ReadOptions?.Backend);
+        Assert.False(reader.ReadOptions?.IncludeBranches);
+        Assert.Equal(reader.CommitsToReturn, builder.Commits);
         Assert.Equal("rian-be", builder.Options?.RepositoryId?.Owner);
         Assert.Equal("ChangeTrace", builder.Options?.RepositoryId?.Name);
         Assert.False(builder.Options?.IncludeFileChanges);
@@ -105,6 +108,33 @@ public sealed class RepositoryExporterTests
         Assert.Equal("save failed", result.Error);
     }
 
+    [Fact]
+    public async Task ExportAsync_LocalRepositoryWithFileChanges_PrefersGitCliBackend()
+    {
+        var repoPath = CreateLocalRepository();
+
+        try
+        {
+            var reader = new TestGitRepositoryReader { CommitsToReturn = [CreateCommitData(1_735_689_600)] };
+            var builder = new TestTimelineBuilder();
+            var exporter = CreateExporter(reader, builder, new TestTimelineRepository());
+
+            var result = await exporter.ExportAsync(repoPath, new ExportOptions
+            {
+                IncludeFileChanges = true,
+                IncludeBranchEvents = false,
+                IncludeMergeDetection = false
+            });
+
+            Assert.True(result.IsSuccess, result.Error);
+            Assert.Equal(GitHistoryReaderBackend.GitCli, reader.ReadOptions?.Backend);
+        }
+        finally
+        {
+            TryDeleteDirectory(repoPath);
+        }
+    }
+
     /// <summary>Creates an exporter wired with test doubles.</summary>
     private static RepositoryExporter CreateExporter(
         IGitRepositoryReader reader,
@@ -127,6 +157,80 @@ public sealed class RepositoryExporterTests
             [],
             [BranchName.Create("main").Value],
             IsMerge: false);
+
+    private static string CreateLocalRepository()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            "ChangeTrace.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(path);
+        RunGit(path, "init");
+        RunGit(path, "config", "user.name", "ChangeTrace Test");
+        RunGit(path, "config", "user.email", "changetrace@example.com");
+        File.WriteAllText(Path.Combine(path, "alpha.txt"), "one");
+        RunGit(path, "add", ".");
+        RunGit(
+            path,
+            new Dictionary<string, string>
+            {
+                ["GIT_AUTHOR_DATE"] = "2026-01-01T00:00:00Z",
+                ["GIT_COMMITTER_DATE"] = "2026-01-01T00:00:00Z"
+            },
+            "commit",
+            "-m",
+            "Initial commit");
+
+        return path;
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch
+        {
+            // Best effort cleanup for temporary test repositories.
+        }
+    }
+
+    private static void RunGit(string workingDirectory, params string[] arguments)
+        => RunGit(workingDirectory, null, arguments);
+
+    private static void RunGit(
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environment,
+        params string[] arguments)
+    {
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var pair in environment ?? new Dictionary<string, string>())
+            process.StartInfo.Environment[pair.Key] = pair.Value;
+
+        foreach (var argument in arguments)
+            process.StartInfo.ArgumentList.Add(argument);
+
+        process.Start();
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"git {string.Join(' ', arguments)} failed: {output}{error}");
+    }
 
     /// <summary>Git reader test double that records clone and read calls.</summary>
     private sealed class TestGitRepositoryReader : IGitRepositoryReader
@@ -158,6 +262,33 @@ public sealed class RepositoryExporterTests
             ReadRepositoryPath = repositoryPath;
             ReadOptions = options;
             return Task.FromResult(ReadResult ?? Result<IReadOnlyList<CommitData>>.Success(CommitsToReturn));
+        }
+
+        public Task<Result<IAsyncEnumerable<CommitData>>> ReadCommitsStreamAsync(
+            string repositoryPath,
+            GitReaderOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            ReadRepositoryPath = repositoryPath;
+            ReadOptions = options;
+
+            if (ReadResult.HasValue && ReadResult.Value.IsFailure)
+                return Task.FromResult(Result<IAsyncEnumerable<CommitData>>.Failure(ReadResult.Value.Error!));
+
+            var commits = ReadResult.HasValue ? ReadResult.Value.Value : CommitsToReturn;
+            return Task.FromResult(Result<IAsyncEnumerable<CommitData>>.Success(
+                StreamCommits(commits, cancellationToken)));
+        }
+
+        private static async IAsyncEnumerable<CommitData> StreamCommits(
+            IEnumerable<CommitData> commits,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            foreach (var commit in commits)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return commit;
+            }
         }
 
         /// <summary>Records clone inputs and returns success.</summary>
@@ -196,6 +327,20 @@ public sealed class RepositoryExporterTests
                 ActorName.Create("rian").Value,
                 CommitSha.Create("0123456789abcdef0123456789abcdef01234567").Value));
             return Result<Timeline>.Success(TimelineToReturn);
+        }
+
+        public async Task<Result<Timeline>> BuildAsync(
+            IAsyncEnumerable<CommitData> commits,
+            TimelineBuilderOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            var list = new List<CommitData>();
+            await foreach (var commit in commits.WithCancellation(cancellationToken))
+            {
+                list.Add(commit);
+            }
+
+            return Build(list, options);
         }
     }
 

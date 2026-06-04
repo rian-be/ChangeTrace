@@ -35,18 +35,32 @@ internal sealed class ExportCommand : ICliCommand
     {
         var cmd = new Command("export", "Export repository timeline");
         
-        var repoArg = new Argument<string>("repository")  {  Description = "Local path or HTTPS URL to Git repository" };
+        var repoArg = new Argument<string?>("repository")
+        {
+            Arity = ArgumentArity.ZeroOrOne,
+            Description = "Local path or HTTPS URL to Git repository. Defaults to the current Git repository."
+        };
         var outputOpt = new Option<string?>("--output", "-o")
         {
             Description = "Explicit output .gittrace path. When omitted, export is saved under the active workspace."
         };
         var tokenOpt = new Option<string?>("--token", "-r")  { Description = "GitHub personal access token" };
         var verboseOpt = new Option<bool>("--verbose", "-v") { Description = "Enable verbose logging" };
+        var gitCliOpt = new Option<bool>("--git-cli")
+        {
+            Description = "Use Git CLI streaming backend. Recommended for larger local histories or when file-change extraction is expensive."
+        };
+        var noRenamesOpt = new Option<bool>("--no-renames")
+        {
+            Description = "Skip rename detection when using Git CLI file-change extraction. Faster, but renames are reported as delete/add."
+        };
         
         cmd.Arguments.Add(repoArg);
         cmd.Options.Add(outputOpt);
         cmd.Options.Add(tokenOpt);
         cmd.Options.Add(verboseOpt);
+        cmd.Options.Add(gitCliOpt);
+        cmd.Options.Add(noRenamesOpt);
         
         return cmd;
     }

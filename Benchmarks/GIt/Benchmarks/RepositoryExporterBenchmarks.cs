@@ -87,6 +87,30 @@ public class RepositoryExporterBenchmarks
             return Task.FromResult(Result<IReadOnlyList<CommitData>>.Success(selected));
         }
 
+        public Task<Result<IAsyncEnumerable<CommitData>>> ReadCommitsStreamAsync(
+            string repositoryPath,
+            GitReaderOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            IEnumerable<CommitData> selected = options.MaxCommits > 0
+                ? commits.Take(options.MaxCommits)
+                : commits;
+
+            return Task.FromResult(Result<IAsyncEnumerable<CommitData>>.Success(
+                StreamCommits(selected, cancellationToken)));
+        }
+
+        private static async IAsyncEnumerable<CommitData> StreamCommits(
+            IEnumerable<CommitData> commits,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            foreach (var commit in commits)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return commit;
+            }
+        }
+
         public Task<Result> CloneAsync(
             string url,
             string destinationPath,

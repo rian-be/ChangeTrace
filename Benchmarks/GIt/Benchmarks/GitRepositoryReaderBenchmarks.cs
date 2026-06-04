@@ -61,4 +61,44 @@ public class GitRepositoryReaderBenchmarks
 
         return result.Value.Sum(commit => commit.FileChanges.Count);
     }
+
+    [Benchmark]
+    public async Task<int> ReadCommitsOnlyWithGitCli()
+    {
+        var result = await _reader.ReadCommitsAsync(
+            _fixture.RepositoryPath,
+            new GitReaderOptions(
+                IncludeFileChanges: false,
+                MaxCommits: CommitCount,
+                Backend: GitHistoryReaderBackend.GitCli));
+
+        return result.Value.Count;
+    }
+
+    [Benchmark]
+    public async Task<int> ReadCommitsWithFileChangesWithGitCli()
+    {
+        var result = await _reader.ReadCommitsAsync(
+            _fixture.RepositoryPath,
+            new GitReaderOptions(
+                IncludeFileChanges: true,
+                MaxCommits: CommitCount,
+                Backend: GitHistoryReaderBackend.GitCli));
+
+        return result.Value.Sum(commit => commit.FileChanges.Count);
+    }
+
+    [Benchmark]
+    public async Task<int> ReadCommitsWithFileChangesWithGitCliNoRenames()
+    {
+        var result = await _reader.ReadCommitsAsync(
+            _fixture.RepositoryPath,
+            new GitReaderOptions(
+                IncludeFileChanges: true,
+                MaxCommits: CommitCount,
+                Backend: GitHistoryReaderBackend.GitCli,
+                DetectRenames: false));
+
+        return result.Value.Sum(commit => commit.FileChanges.Count);
+    }
 }

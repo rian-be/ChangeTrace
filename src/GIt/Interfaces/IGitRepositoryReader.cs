@@ -29,6 +29,15 @@ internal interface IGitRepositoryReader
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Streams commits from a local Git repository without requiring the reader to materialize
+    /// the full history before consumers can start processing it.
+    /// </summary>
+    Task<Result<IAsyncEnumerable<CommitData>>> ReadCommitsStreamAsync(
+        string repositoryPath,
+        GitReaderOptions options,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Clones a remote Git repository to a local path.
     /// </summary>
     /// <param name="url">Remote repository URL.</param>

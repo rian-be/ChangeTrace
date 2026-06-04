@@ -27,10 +27,10 @@ internal sealed class WorkspaceTimelineStorage : IWorkspaceTimelineStorage
     private readonly IProfileStore<OrganizationProfile>? _organizationStore;
 
     /// <summary>
-    /// Creates torage service rooted at the application directory.
+    /// Creates storage service rooted at the user's ChangeTrace data directory.
     /// </summary>
     public WorkspaceTimelineStorage(IProfileStore<OrganizationProfile> organizationStore)
-        : this(AppContext.BaseDirectory, organizationStore)
+        : this(GetUserDataDirectory(), organizationStore)
     {
     }
 
@@ -289,6 +289,11 @@ internal sealed class WorkspaceTimelineStorage : IWorkspaceTimelineStorage
             ? "unknown"
             : slug;
     }
+
+    private static string GetUserDataDirectory()
+        => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".changetrace");
 
     /// <summary>
     /// Represents repository owner and name.
