@@ -6,9 +6,18 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         
-        <RuntimeIdentifiers>win-x64;linux-x64;osx-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
+        <RuntimeIdentifiers Condition="'$(_IsPacking)' != 'true'">win-x64;linux-x64;osx-x64;linux-arm64;osx-arm64</RuntimeIdentifiers>
         <SelfContained>false</SelfContained> 
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks> 
+
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>changetrace</ToolCommandName>
+        <PackageId>ChangeTrace</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>rian-be</Authors>
+        <Description>Git repository timeline tracing and visualization CLI.</Description>
+        <PackageOutputPath>nupkg</PackageOutputPath>
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
         
         <!-- Fix Git metadata errors -->
         <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
@@ -51,6 +60,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Include="readme.md" Pack="true" PackagePath="\" />
+
         <Content Include="Assets/**/*" Exclude="Assets/**/*.cs">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

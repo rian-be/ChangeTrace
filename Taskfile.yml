@@ -60,6 +60,30 @@ tasks:
       - mkdir -p dist
       - cd {{.PUBLISH_DIR}} && zip -r ../../dist/ChangeTrace-{{.RUNTIME}}.zip .
 
+  tool:pack:
+    desc: Pack ChangeTrace as a local .NET tool
+    cmds:
+      - dotnet pack {{.PROJECT}} -c Release
+
+  tool:install:
+    desc: Install ChangeTrace globally from the local tool package
+    deps:
+      - tool:pack
+    cmds:
+      - dotnet tool install --global --add-source nupkg --ignore-failed-sources ChangeTrace
+
+  tool:update:
+    desc: Update the globally installed ChangeTrace tool from the local package
+    deps:
+      - tool:pack
+    cmds:
+      - dotnet tool update --global --add-source nupkg --ignore-failed-sources ChangeTrace
+
+  tool:uninstall:
+    desc: Uninstall the global ChangeTrace tool
+    cmds:
+      - dotnet tool uninstall --global ChangeTrace
+
   prerelease:tag:
     desc: Create and push a prerelease tag. Example TAG=v0.62.24-pre.1
     preconditions:
