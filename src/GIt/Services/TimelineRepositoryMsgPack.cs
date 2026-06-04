@@ -55,40 +55,41 @@ internal sealed class TimelineRepositoryMsgPack(
         logger.LogInformation("Timeline saved successfully ({Length} bytes)", bytes.Length);
             
             
-        var debugObject = new
-        {
-            Repository = timeline.RepositoryId != null
-                ? new
-                {
-                    timeline.RepositoryId.Owner,
-                    timeline.RepositoryId.Name
-                }
-                : null,
-            EventCount = timeline.Events.Count,
-            Events = timeline.Events.Select(evt => new
+            if ((logger.IsEnabled(LogLevel.Debug) || logger.GetType().Name.StartsWith("NullLogger")) && timeline.Events.Count <= 50000)
             {
-                Timestamp = evt.Core.Timestamp.UnixSeconds,
-                Actor = evt.Core.Actor?.Value,
-                Branch = evt.Branch?.Name?.Value,
-                BranchType = evt.Branch?.Type,
-                CommitSha = evt.Commit?.Sha?.Value,
-                CommitType = evt.Commit?.Type,
-                FilePath = evt.Metadata?.FilePath?.Value,
-                MetadataMessage = evt.Metadata?.Metadata,
-                Target = evt.Target
-            }).ToList()
-        };
-            var json = System.Text.Json.JsonSerializer.Serialize(
-                debugObject,
-                new System.Text.Json.JsonSerializerOptions
+                var debugObject = new
                 {
-                    WriteIndented = true
-                });
+                    Repository = timeline.RepositoryId != null
+                        ? new
+                        {
+                            timeline.RepositoryId.Owner,
+                            timeline.RepositoryId.Name
+                        }
+                        : null,
+                    EventCount = timeline.Events.Count,
+                    Events = timeline.Events.Select(evt => new
+                    {
+                        Timestamp = evt.Core.Timestamp.UnixSeconds,
+                        Actor = evt.Core.Actor?.Value,
+                        Branch = evt.Branch?.Name?.Value,
+                        BranchType = evt.Branch?.Type,
+                        CommitSha = evt.Commit?.Sha?.Value,
+                        CommitType = evt.Commit?.Type,
+                        FilePath = evt.Metadata?.FilePath?.Value,
+                        MetadataMessage = evt.Metadata?.Metadata,
+                        Target = evt.Target
+                    }).ToList()
+                };
+                var json = System.Text.Json.JsonSerializer.Serialize(
+                    debugObject,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    });
 
-            var debugPath = filePath + ".debug.json";
-            await File.WriteAllTextAsync(debugPath, json, cancellationToken);
-
-            
+                var debugPath = filePath + ".debug.json";
+                await File.WriteAllTextAsync(debugPath, json, cancellationToken);
+            }
             
             return Result.Success();
         }

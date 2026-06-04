@@ -13,7 +13,7 @@ namespace ChangeTrace.CredentialTrace.Services;
 /// <typeparam name="TProfile">Type of profile, must implement <see cref="IProfile"/>.</typeparam>
 /// <remarks>
 /// <list type="bullet">
-/// <item>Persists profiles as JSON files under AppContext base directory.</item>
+/// <item>Persists profiles as JSON files under the user's ChangeTrace data directory.</item>
 /// <item>Caches loaded profiles in memory for fast access.</item>
 /// <item>Supports saving, deleting, and querying profiles by ID or name.</item>
 /// <item>Registered as singleton via <see cref="AutoRegisterAttribute"/>.</item>
@@ -32,7 +32,7 @@ internal sealed class FileProfileStore<TProfile> : IProfileStore<TProfile>
     /// </summary>
     public FileProfileStore()
     {
-        _dataDir = Path.Combine(AppContext.BaseDirectory, "profiles", typeof(TProfile).Name);
+        _dataDir = Path.Combine(GetUserDataDirectory(), "profiles", typeof(TProfile).Name);
         Directory.CreateDirectory(_dataDir);
 
         _jsonOptions = new JsonSerializerOptions
@@ -118,4 +118,9 @@ internal sealed class FileProfileStore<TProfile> : IProfileStore<TProfile>
     /// <inheritdoc/>
     public Task<IEnumerable<TProfile>> GetAllAsync(CancellationToken ct = default)
         => Task.FromResult<IEnumerable<TProfile>>(_cache.Values);
+
+    private static string GetUserDataDirectory()
+        => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".changetrace");
 }

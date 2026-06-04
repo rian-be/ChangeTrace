@@ -11,4 +11,9 @@ internal interface ITimelineBuilder
     Result<Timeline> Build(
         IReadOnlyList<CommitData> commits,
         TimelineBuilderOptions options);
+
+    Task<Result<Timeline>> BuildAsync(
+        IAsyncEnumerable<CommitData> commits,
+        TimelineBuilderOptions options,
+        CancellationToken cancellationToken = default);
 }

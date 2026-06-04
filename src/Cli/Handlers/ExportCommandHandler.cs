@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Diagnostics;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Interfaces;
@@ -26,10 +27,19 @@ internal sealed class ExportCommandHandler(
     /// </summary>
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
-        var repo = parseResult.GetValue<string>("repository")!;
+        var repoResult = ResolveRepository(parseResult.GetValue<string?>("repository"));
+        if (repoResult is { IsSuccess: false })
+        {
+            AnsiConsole.MarkupLine($"[red]Failed:[/] {Markup.Escape(repoResult.Error!)}");
+            return;
+        }
+
+        var repo = repoResult.Value!;
         var explicitOutput = parseResult.GetValue<string?>("--output");
         var token = parseResult.GetValue<string?>("--token");
         var verbose = parseResult.GetValue<bool>("--verbose");
+        var useGitCli = parseResult.GetValue<bool>("--git-cli");
+        var noRenames = parseResult.GetValue<bool>("--no-renames");
         var exportedAt = DateTimeOffset.UtcNow;
 
         var output = explicitOutput;
@@ -39,24 +49,28 @@ internal sealed class ExportCommandHandler(
         {
             if (workspace == null)
             {
-                AnsiConsole.MarkupLine(
-                    "[red]Failed:[/] no active workspace selected. Use [yellow]workspace use <org> <name>[/] or pass [yellow]--output/-o[/].");
-                return;
+                var repoName = GetRepositoryName(repo);
+                output = Path.Combine(Directory.GetCurrentDirectory(), $"{repoName}.gittrace");
             }
-
-            output = await workspaceTimelineStorage.CreateTimelinePathAsync(
-                workspace,
-                repo,
-                exportedAt,
-                Ulid.NewUlid().ToString(),
-                ct);
+            else
+            {
+                output = await workspaceTimelineStorage.CreateTimelinePathAsync(
+                    workspace,
+                    repo,
+                    exportedAt,
+                    Ulid.NewUlid().ToString(),
+                    ct);
+            }
         }
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            var provider = ProviderUrlHelper.DetectProvider(repo);
-            var session = await sessionAuthStore.GetSession(provider, ct);
-            token = session?.AccessToken;
+            var provider = TryDetectProvider(repo);
+            if (provider is not null)
+            {
+                var session = await sessionAuthStore.GetSession(provider, ct);
+                token = session?.AccessToken;
+            }
         }
 
         var options = new ExportOptions
@@ -65,6 +79,10 @@ internal sealed class ExportCommandHandler(
             IncludeMergeDetection = true,
             EnrichWithPullRequests = true,
             IncludeBranchEvents = true,
+            HistoryBackend = useGitCli
+                ? GitHistoryReaderBackend.GitCli
+                : GitHistoryReaderBackend.LibGit2Sharp,
+            DetectRenames = !noRenames,
         };
 
         ProgressCallback? progress = verbose
@@ -93,5 +111,156 @@ internal sealed class ExportCommandHandler(
             await workspaceTimelineStorage.SaveMetadataAsync(output, workspace, repo, exportedAt, ct);
 
         AnsiConsole.MarkupLine($"[green]Exported successfully to[/] {Markup.Escape(output)}");
+        if (workspace == null)
+        {
+            var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), output);
+            AnsiConsole.MarkupLine($"[blue]Tip:[/] Run [yellow]changetrace show {Markup.Escape(relativePath)}[/] to visualize the timeline.");
+        }
+    }
+
+    private static string? TryDetectProvider(string repository)
+    {
+        try
+        {
+            return ProviderUrlHelper.DetectProvider(repository);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static RepositoryResolution ResolveRepository(string? repository)
+    {
+        if (!string.IsNullOrWhiteSpace(repository) && IsRemoteRepository(repository))
+            return RepositoryResolution.Success(repository);
+
+        var startPath = string.IsNullOrWhiteSpace(repository)
+            ? Directory.GetCurrentDirectory()
+            : Path.GetFullPath(repository);
+
+        if (File.Exists(startPath))
+            startPath = Path.GetDirectoryName(startPath)!;
+
+        if (!Directory.Exists(startPath))
+            return RepositoryResolution.Failure($"Directory not found: {startPath}");
+
+        var gitRoot = FindGitRoot(startPath);
+        return gitRoot is null
+            ? RepositoryResolution.Failure(
+                $"No Git repository found from '{startPath}'. This command needs a real Git checkout with a .git directory or gitfile.")
+            : RepositoryResolution.Success(gitRoot);
+    }
+
+    private static string? FindGitRoot(string startPath)
+    {
+        return FindGitRootWithGit(startPath) ?? FindGitRootByWalkingParents(startPath);
+    }
+
+    private static string? FindGitRootWithGit(string startPath)
+    {
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.StartInfo.ArgumentList.Add("-C");
+            process.StartInfo.ArgumentList.Add(startPath);
+            process.StartInfo.ArgumentList.Add("rev-parse");
+            process.StartInfo.ArgumentList.Add("--show-toplevel");
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+                return null;
+
+            var root = output.Trim();
+            return Directory.Exists(root) ? root : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? FindGitRootByWalkingParents(string startPath)
+    {
+        var current = new DirectoryInfo(startPath);
+        while (current is not null)
+        {
+            var dotGitPath = Path.Combine(current.FullName, ".git");
+            if (Directory.Exists(dotGitPath) || File.Exists(dotGitPath))
+                return current.FullName;
+
+            current = current.Parent;
+        }
+
+        return null;
+    }
+
+    private static bool IsRemoteRepository(string repository)
+    {
+        if (Uri.TryCreate(repository, UriKind.Absolute, out var uri))
+            return uri.Scheme is "http" or "https" or "ssh" or "git";
+
+        var atIndex = repository.IndexOf('@');
+        var colonIndex = repository.IndexOf(':');
+        return atIndex > 0 && colonIndex > atIndex;
+    }
+
+    private static string GetRepositoryName(string repository)
+    {
+        if (IsRemoteRepository(repository))
+        {
+            try
+            {
+                var url = repository.Replace("git@github.com:", "https://github.com/");
+                if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                {
+                    var segments = uri.AbsolutePath
+                        .Trim('/')
+                        .Split('/', StringSplitOptions.RemoveEmptyEntries);
+                    if (segments.Length >= 2)
+                    {
+                        var name = segments[1];
+                        if (name.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+                            name = name[..^4];
+                        return name;
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+        }
+
+        var repoDir = repository.TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar);
+
+        var dirName = Path.GetFileName(repoDir);
+
+        if (dirName.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+            dirName = dirName[..^4];
+
+        return string.IsNullOrWhiteSpace(dirName) ? "repository" : dirName;
+    }
+
+    private readonly record struct RepositoryResolution(bool IsSuccess, string? Value, string? Error)
+    {
+        public static RepositoryResolution Success(string value) => new(true, value, null);
+        public static RepositoryResolution Failure(string error) => new(false, null, error);
     }
 }
