@@ -12,15 +12,4 @@ namespace ChangeTrace.Core.Events.Info;
 /// <item>Indicates the type of pull request event using <see cref="Type"/>.</item>
 /// </list>
 /// </remarks>
-internal readonly record struct PullRequestInfo(PullRequestNumber Number, PullRequestEventType Type)
-{
-    /// <summary>
-    /// Gets the number of pull request associated with this event.
-    /// </summary>
-    public readonly PullRequestNumber Number = Number;
-
-    /// <summary>
-    /// Gets the type of pull request event.
-    /// </summary>
-    public readonly PullRequestEventType Type = Type;
-}
+internal readonly record struct PullRequestInfo(PullRequestNumber Number, PullRequestEventType Type);

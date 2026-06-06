@@ -126,6 +126,65 @@ internal sealed class BranchTracker
     }
 
     /// <summary>
+    /// Gets deleted branches with their last commit SHA and timestamp by comparing
+    /// the current tracked state against the branches attached to the current commit.
+    /// </summary>
+    public PooledDeletedBranches GetDeletedPooled(IReadOnlyList<BranchName> currentBranches)
+    {
+        int deletedCount = 0;
+        foreach (string key in _states.Keys)
+        {
+            if (!ContainsBranch(currentBranches, key))
+                deletedCount++;
+        }
+
+        if (deletedCount == 0)
+            return default;
+
+        (string Name, CommitSha LastSha, Timestamp LastTimestamp)[] array =
+            ArrayPool<(string, CommitSha, Timestamp)>.Shared.Rent(deletedCount);
+        int index = 0;
+        List<string>? toRemove = null;
+
+        foreach (var kvp in _states)
+        {
+            if (ContainsBranch(currentBranches, kvp.Key))
+                continue;
+
+            array[index++] = (kvp.Key, kvp.Value.Sha, kvp.Value.Timestamp);
+            toRemove ??= [];
+            toRemove.Add(kvp.Key);
+        }
+
+        if (toRemove is not null)
+        {
+            foreach (string name in toRemove)
+                _states.Remove(name);
+        }
+
+        return new PooledDeletedBranches(array, deletedCount);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool ContainsBranch(
+        IReadOnlyList<BranchName> currentBranches,
+        string branchName)
+    {
+        for (int index = 0; index < currentBranches.Count; index++)
+        {
+            if (string.Equals(
+                currentBranches[index].Value,
+                branchName,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Internal state record for a tracked branch.
     /// </summary>
     private record struct BranchState(CommitSha Sha, Timestamp Timestamp);

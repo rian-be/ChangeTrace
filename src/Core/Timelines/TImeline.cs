@@ -14,9 +14,11 @@ namespace ChangeTrace.Core.Timelines;
 /// <item>Acts as the primary container for timeline-based analysis and playback.</item>
 /// </list>
 /// </remarks>
-internal sealed class Timeline(RepositoryId? repositoryId)
+internal sealed class Timeline(RepositoryId? repositoryId, int initialCapacity = 0)
 {
-    private readonly List<TraceEvent> _events = [];
+    private readonly List<TraceEvent> _events = initialCapacity > 0
+        ? new List<TraceEvent>(initialCapacity)
+        : [];
 
     /// <summary>
     /// Gets the list of events in the timeline.
