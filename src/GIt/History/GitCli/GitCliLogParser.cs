@@ -299,7 +299,7 @@ internal static class GitCliLogParser
     /// <summary>
     /// Converts parsed git log fields into commit data.
     /// </summary>
-    private static CommitData? MapCommit(
+    internal static CommitData? MapCommit(
         string[]? fields,
         IReadOnlyList<FileChange>? fileChanges,
         IReadOnlyList<BranchName> branches)
@@ -308,7 +308,7 @@ internal static class GitCliLogParser
             return null;
 
         var shaResult = CommitSha.Create(fields[0]);
-        var authorResult = ActorName.Create(fields[1]);
+        var authorResult = ActorName.Create(NormalizeAuthor(fields[1]));
 
         var timestampResult = long.TryParse(fields[2], out var unixSeconds)
             ? Timestamp.Create(unixSeconds)
@@ -341,6 +341,18 @@ internal static class GitCliLogParser
             FileChanges: fileChanges,
             Branches: branches,
             IsMerge: parentShas.Count > 1);
+    }
+
+    private static string NormalizeAuthor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "Unknown";
+
+        value = value.Trim();
+
+        return value.Length <= 200
+            ? value
+            : value[..200];
     }
 
     /// <summary>

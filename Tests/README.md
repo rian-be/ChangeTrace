@@ -2,6 +2,23 @@
 
 Regression tests live in `Tests/ChangeTrace.Tests.csproj`.
 
+## Structure
+
+The test project is split by test purpose first:
+
+- `Unit/` contains regular domain and module tests
+- `Diagnostics/` contains heavier environment-specific investigation tests
+- `Shared/` contains test doubles and shared helpers
+
+Under `Unit/`, tests stay grouped by product area:
+
+- `Unit/Core`
+- `Unit/GIt`
+- `Unit/Cli`
+- `Unit/Player`
+- `Unit/Rendering`
+- `Unit/CredentialTrace`
+
 ## Run
 
 ```bash
