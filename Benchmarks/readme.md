@@ -149,18 +149,31 @@ task benchmark
 
 ## Project Structure
 
-The benchmark project is split by measured subsystem:
+The benchmark project is split first by benchmark type, then by measured domain:
 
-- `Core/Benchmarks` contains timeline, serialization, normalization, and aggregation benchmark entry points
-- `Core/Fixtures` contains shared deterministic Core benchmark data setup
-- `GIt/Benchmarks` contains Git reader and export orchestration benchmark entry points
-- `GIt/Fixtures` contains local synthetic repository setup for Git reader benchmarks
-- `Rendering/Benchmarks` contains render pipeline benchmark entry points
-- `Rendering/Fixtures` contains shared render benchmark data setup
-- `Rendering/Gpu` contains CPU-side GPU data preparation benchmarks
-- `Rendering/Layout` contains layout engine benchmarks
-- `Player/Benchmarks` contains player and playback benchmark entry points
-- `Player/Fixtures` contains shared player timeline setup
+- `Micro/` contains small, isolated CPU-path benchmarks
+- `Subsystem/` contains module-level benchmarks with a broader surface area
+- `Scenario/` contains workflow-style benchmarks such as export orchestration
+
+Shared deterministic setup stays under `Shared/`:
+
+- `Shared/Core` contains shared Core benchmark data
+- `Shared/GIt` contains local synthetic repository setup
+- `Shared/Rendering` contains shared render benchmark data
+- `Shared/Rendering/Gpu` contains shared GPU buffer benchmark data types
+- `Shared/Player` contains shared player timeline setup
+
+Current type-to-domain layout:
+
+- `Micro/Core` contains normalization, aggregation, and file-coupling benchmarks
+- `Micro/Player` contains cursor, seek, and stepper benchmarks
+- `Micro/Rendering` contains render event translation, layout, and GPU buffer preparation benchmarks
+- `Subsystem/Core` contains timeline builder and serialization benchmarks
+- `Subsystem/GIt` contains Git reader benchmarks
+- `Subsystem/Player` contains player factory benchmarks
+- `Subsystem/Rendering` contains render state and scene snapshot assembly benchmarks
+- `Scenario/GIt` contains export orchestration benchmarks
+- `Scenario/Rendering` contains frame update and frame submission benchmarks
 
 The render benchmark suite maps to issue #17:
 

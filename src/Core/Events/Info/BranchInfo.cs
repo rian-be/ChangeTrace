@@ -13,14 +13,4 @@ namespace ChangeTrace.Core.Events.Info;
 /// </list>
 /// </remarks>
 internal readonly record struct BranchInfo(BranchName Name, BranchEventType Type)
-{
-    /// <summary>
-    /// Gets the branch name associated with this event.
-    /// </summary>
-    public readonly BranchName Name = Name;
-
-    /// <summary>
-    /// Gets the type of branch event.
-    /// </summary>
-    public readonly BranchEventType Type = Type;
-}
+;
