@@ -55,5 +55,8 @@ internal sealed record RepositoryId : ValueObject
         return Create(parts[0], parts[1]);
     }
 
+    internal static RepositoryId FromTrustedSerialized(string owner, string name)
+        => new(owner, name);
+
     public override string ToString() => FullName;
 }

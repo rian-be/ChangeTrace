@@ -42,6 +42,9 @@ internal sealed partial record CommitSha : ValueObject
             : Result<CommitSha>.Success(new CommitSha(value));
     }
 
+    internal static CommitSha FromTrustedSerialized(string value)
+        => new(value);
+
     /// <summary>
     /// Checks whether this SHA matches another SHA, supporting partial matching.
     /// Compares up to the length of the shorter SHA.

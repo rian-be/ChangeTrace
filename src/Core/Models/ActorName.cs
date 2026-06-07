@@ -30,6 +30,9 @@ internal sealed record ActorName : ValueObject
             ? Result<ActorName>.Failure("Actor name too long")
             : Result<ActorName>.Success(new ActorName(value));
     }
+
+    internal static ActorName FromTrustedSerialized(string value)
+        => new(value);
     
     public override string ToString() => Value;
     public static implicit operator string(ActorName actor) => actor.Value;

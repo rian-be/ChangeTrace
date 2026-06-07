@@ -47,6 +47,9 @@ internal readonly struct Timestamp : IComparable<Timestamp>
             : Result<Timestamp>.Success(new Timestamp(unixSeconds));
     }
 
+    internal static Timestamp FromTrustedUnixSeconds(long unixSeconds)
+        => new(unixSeconds);
+
     /// <summary>
     /// Current UTC timestamp.
     /// </summary>

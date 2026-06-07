@@ -135,6 +135,22 @@ public sealed class TimelineRepositoryMsgPackTests
             return Task.FromResult(BytesToLoad);
         }
 
+        public Task<Stream> OpenWriteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            SavedPath = path;
+
+            Stream stream = new RecordingMemoryStream(bytes => SavedBytes = bytes);
+            return Task.FromResult(stream);
+        }
+
+        public Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+        {
+            LoadedPath = path;
+            Stream stream = new MemoryStream(BytesToLoad, writable: false);
+            return Task.FromResult(stream);
+        }
+
         /// <summary>Returns whether a file exists on disk.</summary>
         public bool Exists(string path) => File.Exists(path);
 
@@ -148,5 +164,16 @@ public sealed class TimelineRepositoryMsgPackTests
 
         /// <summary>Returns no files for tests that do not cover file discovery.</summary>
         public IEnumerable<string> FindFiles(string directory, string extension) => [];
+
+        private sealed class RecordingMemoryStream(Action<byte[]> onDispose) : MemoryStream
+        {
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                    onDispose(ToArray());
+
+                base.Dispose(disposing);
+            }
+        }
     }
 }
