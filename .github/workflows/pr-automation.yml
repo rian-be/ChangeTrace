@@ -41,3 +41,57 @@ jobs:
         with:
           configuration-path: .github/config/labeler.yml
           sync-labels: true
+
+  performance-labeler:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Apply Performance label from issues or PR text
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const text = `${pr.title}\n${pr.body || ''}`.toLowerCase();
+            const keywordMatch = /(perf|performance|benchmark|optimiz|allocation|memory pressure|throughput|latency)/i.test(text);
+            const issueNumbers = new Set();
+
+            for (const match of text.matchAll(/(?:closes|fixes|related to)\s+#(\d+)/gi)) {
+              issueNumbers.add(Number(match[1]));
+            }
+
+            for (const match of text.matchAll(/#(\d+)/g)) {
+              issueNumbers.add(Number(match[1]));
+            }
+
+            let issueMatch = false;
+
+            for (const number of issueNumbers) {
+              const issue = await github.rest.issues.get({ owner, repo, issue_number: number });
+              const labels = issue.data.labels.map(label => label.name);
+
+              if (labels.includes('Performance')) {
+                issueMatch = true;
+                break;
+              }
+            }
+
+            if (!keywordMatch && !issueMatch) {
+              core.info('Performance label not applicable for this PR.');
+              return;
+            }
+
+            const currentLabels = pr.labels.map(label => label.name);
+            if (currentLabels.includes('Performance')) {
+              core.info('Performance label already present.');
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pr.number,
+              labels: ['Performance']
+            });
+            core.info('Performance label added.');
