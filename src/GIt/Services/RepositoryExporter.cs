@@ -5,6 +5,7 @@ using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Delegates;
+using ChangeTrace.GIt.Helpers;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,7 @@ internal sealed class RepositoryExporter(
     ITimelineBuilder timelineBuilder,
     ITimelineRepository repository,
     ILogger<RepositoryExporter> logger,
-    ITimelineEnricher? githubEnricher = null) : IRepositoryExporter
+    ITimelineEnricherResolver enricherResolver) : IRepositoryExporter
 {
     /// <summary>
     /// Exports repository to timeline.
@@ -70,7 +71,10 @@ internal sealed class RepositoryExporter(
             progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
 
             // Step 4 and 5 Enrich with PR data & Normalize
-            //await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
+            var enrichResult = await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
+            if (enrichResult.IsFailure)
+                return Result<Timeline>.Failure(enrichResult.Error!);
+
             TimelineNormalizer.Normalize(timeline);
 
             progress?.Invoke("Complete", 4, 4, "Export complete");
@@ -103,7 +107,7 @@ internal sealed class RepositoryExporter(
         ProgressCallback? progress = null,
         CancellationToken cancellationToken = default)
     {
-        if (repository is IStreamingTimelineRepository streamingRepository)
+        if (repository is IStreamingTimelineRepository streamingRepository && !options.EnrichWithPullRequests)
         {
             try
             {
@@ -290,26 +294,67 @@ internal sealed class RepositoryExporter(
     /// <param name="progress">Optional progress callback.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Task completing when enrichment finishes.</returns>
-    private async Task EnrichStep(
+    private async Task<Result> EnrichStep(
         Timeline timeline,
         string pathOrUrl,
         ExportOptions options,
         ProgressCallback? progress,
         CancellationToken ct)
     {
-        if (!options.EnrichWithPullRequests || githubEnricher == null)
-            return;
+        if (!options.EnrichWithPullRequests)
+            return Result.Success();
+
+        var providerResult = TryDetectProvider(pathOrUrl);
+        if (providerResult.IsFailure)
+            return Result.Failure(providerResult.Error!);
+
+        var provider = providerResult.Value;
+        if (provider is null)
+        {
+            logger.LogInformation("No hosting provider detected for enrichment; skipping PR enrichment.");
+            return Result.Success();
+        }
+
+        if (!enricherResolver.TryResolve(provider, out var enricher) || enricher is null)
+        {
+            logger.LogWarning("No timeline enricher registered for provider '{Provider}'", provider);
+            return Result.Success();
+        }
 
         var repositoryId = ExtractRepositoryId(pathOrUrl);
-        if (repositoryId == null) return;
+        if (repositoryId == null)
+            return Result.Failure($"Unable to derive repository identifier for provider '{provider}'.");
 
         progress?.Invoke("Enrich", 3, 4, "Enriching with PR data...");
-        var enrichResult = await githubEnricher.EnrichAsync(timeline, repositoryId, ct);
+        var enrichResult = await enricher.EnrichAsync(timeline, repositoryId, ct);
 
         if (enrichResult.IsSuccess)
             logger.LogInformation("Enriched {Count} events", enrichResult.Value.MatchedCount);
         else
             logger.LogWarning("PR enrichment failed: {Error}", enrichResult.Error);
+
+        return enrichResult.IsSuccess
+            ? Result.Success()
+            : Result.Failure(enrichResult.Error!);
+    }
+
+    private static Result<string?> TryDetectProvider(string pathOrUrl)
+    {
+        if (!IsGitUrl(pathOrUrl))
+            return Result<string?>.Success(null);
+
+        try
+        {
+            return Result<string?>.Success(ProviderUrlHelper.DetectProvider(pathOrUrl));
+        }
+        catch (NotSupportedException ex)
+        {
+            return Result<string?>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return Result<string?>.Failure($"Unable to detect repository provider: {ex.Message}", ex);
+        }
     }
 
     /// <summary>
@@ -336,7 +381,21 @@ internal sealed class RepositoryExporter(
 
         try
         {
-            var url = pathOrUrl.Replace("git@github.com:", "https://github.com/");
+            var url = pathOrUrl;
+
+            if (pathOrUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase))
+            {
+                var atIndex = pathOrUrl.IndexOf('@');
+                var colonIndex = pathOrUrl.IndexOf(':');
+
+                if (atIndex < 0 || colonIndex <= atIndex)
+                    return null;
+
+                var host = pathOrUrl.Substring(atIndex + 1, colonIndex - atIndex - 1);
+                var remainder = pathOrUrl[(colonIndex + 1)..];
+                url = $"https://{host}/{remainder}";
+            }
+
             var uri = new Uri(url);
             var segments = uri.AbsolutePath.Trim('/').Split('/');
 

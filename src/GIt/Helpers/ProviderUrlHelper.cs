@@ -17,7 +17,9 @@ internal static class ProviderUrlHelper
     private static readonly Dictionary<string, string> HostProviderMap =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ["github.com"] = "github"
+            ["github.com"] = "github",
+            ["gitlab.com"] = "gitlab",
+            ["codeberg.org"] = "codeberg"
         };
 
     /// <summary>

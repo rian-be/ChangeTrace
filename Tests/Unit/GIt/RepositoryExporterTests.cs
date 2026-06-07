@@ -144,7 +144,8 @@ public sealed class RepositoryExporterTests
             reader,
             builder,
             repository,
-            NullLogger<RepositoryExporter>.Instance);
+            NullLogger<RepositoryExporter>.Instance,
+            new NoOpTimelineEnricherResolver());
 
     /// <summary>Creates a commit fixture for repository exporter tests.</summary>
     private static CommitData CreateCommitData(long timestamp)
@@ -370,5 +371,15 @@ public sealed class RepositoryExporterTests
         /// <summary>Load is not used by repository exporter tests.</summary>
         public Task<Result<Timeline>> LoadAsync(string filePath, CancellationToken cancellationToken = default)
             => Task.FromResult(Result<Timeline>.Failure("not used"));
+    }
+
+    /// <summary>Timeline enricher resolver test double that intentionally resolves nothing.</summary>
+    private sealed class NoOpTimelineEnricherResolver : ITimelineEnricherResolver
+    {
+        public bool TryResolve(string provider, out ITimelineEnricher? enricher)
+        {
+            enricher = null;
+            return false;
+        }
     }
 }
