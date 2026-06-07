@@ -8,11 +8,7 @@ namespace ChangeTrace.GIt.Interfaces;
 
 internal interface ITimelineBuilder
 {
-    Result<Timeline> Build(
-        IReadOnlyList<CommitData> commits,
-        TimelineBuilderOptions options);
-
-    Task<Result<Timeline>> BuildAsync(
+    Task<Result<Timeline>> Build(
         IAsyncEnumerable<CommitData> commits,
         TimelineBuilderOptions options,
         CancellationToken cancellationToken = default);

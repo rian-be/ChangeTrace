@@ -329,7 +329,7 @@ public sealed class RepositoryExporterTests
             return Result<Timeline>.Success(TimelineToReturn);
         }
 
-        public async Task<Result<Timeline>> BuildAsync(
+        public async Task<Result<Timeline>> Build(
             IAsyncEnumerable<CommitData> commits,
             TimelineBuilderOptions options,
             CancellationToken cancellationToken = default)

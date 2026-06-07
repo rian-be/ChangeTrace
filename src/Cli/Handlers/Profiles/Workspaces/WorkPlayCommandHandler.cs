@@ -9,6 +9,7 @@ using ChangeTrace.CredentialTrace.Profiles;
 using ChangeTrace.Graphics.Window;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
+using ChangeTrace.Cli.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
@@ -132,8 +133,7 @@ internal sealed class WorkPlayCommandHandler(
 
         AnsiConsole.MarkupLine($"[green]Playing[/] {Markup.Escape(selected.Path)}");
 
-        var data = await File.ReadAllBytesAsync(selected.Path, ct);
-        var timeline = await serializer.DeserializeAsync(data, ct);
+        var timeline = await TimelineFileLoader.LoadAsync(serializer, selected.Path, ct);
         var player = playerFactory.Create(timeline, initialSpeed: 1.5, acceleration: 2.5);
 
         using var debugWindow = new DebugWindow(diagnostics);

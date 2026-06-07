@@ -103,6 +103,66 @@ internal sealed class RepositoryExporter(
         ProgressCallback? progress = null,
         CancellationToken cancellationToken = default)
     {
+        if (repository is IStreamingTimelineRepository streamingRepository)
+        {
+            try
+            {
+                logger.LogInformation("Starting streaming export+save: {Path}", pathOrUrl);
+
+                progress?.Invoke("Prepare", 0, 4, "Preparing repository...");
+                var pathResult = await GetRepositoryPathStep(pathOrUrl, cancellationToken);
+                if (pathResult.IsFailure)
+                    return Result.Failure(pathResult.Error!);
+
+                var repoPath = pathResult.Value;
+                progress?.Invoke("Prepare", 1, 4, "Repository ready");
+
+                var repositoryId = ExtractRepositoryId(pathOrUrl);
+                progress?.Invoke("Read", 1, 4, "Reading commits...");
+
+                var backend = SelectHistoryBackend(repoPath, options);
+                var commitsResult = await gitReader.ReadCommitsStreamAsync(
+                    repoPath,
+                    new GitReaderOptions(
+                        IncludeFileChanges: options.IncludeFileChanges,
+                        MaxCommits: options.MaxCommits,
+                        StartDate: options.StartDate,
+                        EndDate: options.EndDate,
+                        Backend: backend,
+                        DetectRenames: options.DetectRenames,
+                        IncludeBranches: options.IncludeBranchEvents || options.IncludeMergeDetection
+                    ),
+                    cancellationToken);
+
+                if (commitsResult.IsFailure)
+                    return Result.Failure(commitsResult.Error!);
+
+                progress?.Invoke("Build", 2, 4, "Streaming timeline to repository...");
+
+                var streamSaveResult = await streamingRepository.SaveAsync(
+                    commitsResult.Value,
+                    outputPath,
+                    new TimelineBuilderOptions(
+                        IncludeFileChanges: options.IncludeFileChanges,
+                        IncludeBranchEvents: options.IncludeBranchEvents,
+                        IncludeMergeDetection: options.IncludeMergeDetection,
+                        RepositoryId: repositoryId),
+                    cancellationToken);
+
+                if (streamSaveResult.IsFailure)
+                    return Result.Failure(streamSaveResult.Error!);
+
+                progress?.Invoke("Complete", 4, 4, "Export complete");
+                logger.LogInformation("Timeline saved to: {Path}", outputPath);
+                return Result.Success();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Streaming export+save failed");
+                return Result.Failure("Export failed", ex);
+            }
+        }
+
         var exportResult = await ExportAsync(pathOrUrl, options, progress, cancellationToken);
 
         if (exportResult.IsFailure)
@@ -189,7 +249,7 @@ internal sealed class RepositoryExporter(
             RepositoryId: repositoryId
         );
 
-        return await timelineBuilder.BuildAsync(commitsResult.Value, builderOptions, ct);
+        return await timelineBuilder.Build(commitsResult.Value, builderOptions, ct);
     }
 
     private GitHistoryReaderBackend SelectHistoryBackend(
@@ -299,16 +359,14 @@ internal sealed class RepositoryExporter(
     {
         try
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "git",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = "git",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
             process.StartInfo.ArgumentList.Add("--version");
             process.Start();
@@ -325,16 +383,14 @@ internal sealed class RepositoryExporter(
     {
         try
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "git",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = "git",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
             process.StartInfo.ArgumentList.Add("-C");
