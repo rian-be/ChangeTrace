@@ -82,6 +82,20 @@ public sealed class WorkspaceContextFileStoreTests
             return Task.FromResult(BytesToLoad);
         }
 
+        public Task<Stream> OpenWriteAsync(string path, CancellationToken cancellationToken = default)
+        {
+            SavedPath = path;
+            Stream stream = new MemoryStream();
+            return Task.FromResult(stream);
+        }
+
+        public Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+        {
+            LoadedPath = path;
+            Stream stream = new MemoryStream(BytesToLoad, writable: false);
+            return Task.FromResult(stream);
+        }
+
         /// <summary>Returns true only for configured existing path.</summary>
         public bool Exists(string path) => path == ExistingPath;
 

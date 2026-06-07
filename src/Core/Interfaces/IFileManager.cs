@@ -25,6 +25,17 @@ internal interface IFileManager
     Task<byte[]> LoadAsync(string path, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Opens a writable stream for the specified path.
+    /// Ensures parent directories exist before opening the stream.
+    /// </summary>
+    Task<Stream> OpenWriteAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Opens a readable stream for the specified path.
+    /// </summary>
+    Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Checks if file exists at path.
     /// </summary>
     /// <param name="path">File path to check.</param>

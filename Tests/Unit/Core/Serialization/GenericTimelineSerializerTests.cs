@@ -47,6 +47,31 @@ public sealed class GenericTimelineSerializerTests
         AssertTimeline(deserialized);
     }
 
+    /// <summary>RoundTrip preserves pull request metadata attached to a timeline event.</summary>
+    [Fact]
+    public async Task RoundTrip_PreservesPullRequestMetadata()
+    {
+        var serializer = new MessagePackSerializer<Timeline>(
+            [new TimelineMessagePackFormatter()]);
+
+        var timeline = new Timeline(RepositoryId.Create("rian-be", "ChangeTrace").Value);
+        var commit = TraceEventFactory.Commit(
+            Timestamp.Create(1_735_689_600).Value,
+            ActorName.Create("rian").Value,
+            CommitSha.Create("0123456789abcdef0123456789abcdef01234567").Value,
+            "Update timeline")
+            .WithPullRequest(
+                PullRequestNumber.Create(27).Value,
+                PullRequestEventType.PullRequestMerged);
+        timeline.AddEvent(commit);
+
+        var bytes = await serializer.SerializeAsync(timeline);
+        var deserialized = await serializer.DeserializeAsync(bytes);
+
+        Assert.Equal(27, deserialized.Events[0].PullRequest?.Number.Value);
+        Assert.Equal(PullRequestEventType.PullRequestMerged, deserialized.Events[0].PullRequest?.Type);
+    }
+
     /// <summary>Creates a timeline containing one file-change event for serializer assertions.</summary>
     private static Timeline CreateTimeline()
     {

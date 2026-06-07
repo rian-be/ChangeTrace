@@ -7,6 +7,7 @@ using ChangeTrace.Core.Timelines;
 using ChangeTrace.Graphics.Window;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
+using ChangeTrace.Cli.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Cli.Handlers.Debug;
@@ -24,7 +25,7 @@ internal sealed class WindowDebugCommandHandler(
     /// <summary>
     /// Loads timeline files and starts player windows with debug diagnostics.
     /// </summary>
-    public Task HandleAsync(
+    public async Task HandleAsync(
         ParseResult parseResult,
         CancellationToken ct)
     {
@@ -33,22 +34,18 @@ internal sealed class WindowDebugCommandHandler(
         if (!File.Exists(filePath))
         {
             Console.WriteLine($"[red]File not found: {filePath}[/]");
-            return Task.CompletedTask;
+            return;
         }
 
         try
         {
             Console.WriteLine($"[cyan]Loading timeline from: {filePath}[/]");
 
-            var data = File.ReadAllBytes(filePath);
+            var fileSize = new FileInfo(filePath).Length;
 
-            Console.WriteLine($"[cyan]File size: {data.Length} bytes[/]");
+            Console.WriteLine($"[cyan]File size: {fileSize} bytes[/]");
 
-            var timeline =
-                serializer
-                    .DeserializeAsync(data, ct)
-                    .GetAwaiter()
-                    .GetResult();
+            var timeline = await TimelineFileLoader.LoadAsync(serializer, filePath, ct);
 
             Console.WriteLine($"[green]Timeline loaded: {timeline.Events.Count} events[/]");
 
@@ -70,13 +67,11 @@ internal sealed class WindowDebugCommandHandler(
             Console.WriteLine(ex.StackTrace);
 
             if (ex.InnerException is null)
-                return Task.CompletedTask;
+                return;
 
             Console.WriteLine($"[red]Inner exception: {ex.InnerException.Message}[/]");
             Console.WriteLine("[red]Inner stack trace:[/]");
             Console.WriteLine(ex.InnerException.StackTrace);
         }
-
-        return Task.CompletedTask;
     }
 }

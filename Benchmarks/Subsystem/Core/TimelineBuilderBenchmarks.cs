@@ -5,7 +5,7 @@ using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace ChangeTrace.Benchmarks.Core.Benchmarks;
+namespace ChangeTrace.Benchmarks.Subsystem.Core;
 
 /// <summary>
 /// Benchmarks timeline construction from already-read commit data.
@@ -54,14 +54,36 @@ public class TimelineBuilderBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public int BuildWithCommitsOnly()
-        => _builder.Build(_commits, CommitsOnlyOptions).Value.Count;
+    public async Task<int> BuildWithCommitsOnly()
+        => (await _builder.Build(ToAsyncEnumerable(_commits), CommitsOnlyOptions)).Value.Count;
 
     [Benchmark]
-    public int BuildWithFileChanges()
-        => _builder.Build(_commits, FileChangesOptions).Value.Count;
+    public async Task<int> BuildWithFileChanges()
+        => (await _builder.Build(ToAsyncEnumerable(_commits), FileChangesOptions)).Value.Count;
 
     [Benchmark]
-    public int BuildWithAllEvents()
-        => _builder.Build(_commits, AllEventsOptions).Value.Count;
+    public async Task<int> BuildWithAllEvents()
+        => (await _builder.Build(ToAsyncEnumerable(_commits), AllEventsOptions)).Value.Count;
+
+    private static IAsyncEnumerable<CommitData> ToAsyncEnumerable(IEnumerable<CommitData> commits)
+        => new AsyncEnumerableAdapter(commits);
+
+    private sealed class AsyncEnumerableAdapter(IEnumerable<CommitData> commits) : IAsyncEnumerable<CommitData>
+    {
+        public IAsyncEnumerator<CommitData> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+            => new AsyncEnumerator(commits.GetEnumerator());
+
+        private sealed class AsyncEnumerator(IEnumerator<CommitData> enumerator) : IAsyncEnumerator<CommitData>
+        {
+            public CommitData Current => enumerator.Current;
+
+            public ValueTask<bool> MoveNextAsync() => new(enumerator.MoveNext());
+
+            public ValueTask DisposeAsync()
+            {
+                enumerator.Dispose();
+                return default;
+            }
+        }
+    }
 }

@@ -41,6 +41,9 @@ internal sealed record FilePath : ValueObject
         return Result<FilePath>.Success(new FilePath(value));
     }
 
+    internal static FilePath FromTrustedSerialized(string value)
+        => new(value);
+
     /// <summary>
     /// Checks whether this file path is inside the specified directory.
     /// </summary>

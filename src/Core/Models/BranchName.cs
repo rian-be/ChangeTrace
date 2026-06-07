@@ -50,6 +50,9 @@ internal sealed record BranchName : ValueObject
         return Result<BranchName>.Success(new BranchName(value));
     }
 
+    internal static BranchName FromTrustedSerialized(string value)
+        => new(value);
+
     public override string ToString() => Value;
     public static implicit operator string(BranchName branch) => branch.Value;
 }

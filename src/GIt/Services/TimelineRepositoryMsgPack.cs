@@ -1,96 +1,48 @@
+using System.Buffers;
 using ChangeTrace.Configuration.Discovery;
-using ChangeTrace.Core;
+using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Interfaces;
+using ChangeTrace.Core.Models;
+using ChangeTrace.Core.Options;
 using ChangeTrace.Core.Results;
+using ChangeTrace.Core.Services;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MessagePack;
 
 namespace ChangeTrace.GIt.Services;
 
 /// <summary>
-/// Repository implementation for persisting and loading <see cref="Timeline"/> objects
-/// using MsgPack serialization.
+/// Saves and loads timelines using MsgPack.
+/// Handles .gittrace persistence and streaming export writes.
 /// </summary>
-/// <remarks>
-/// This class handles the full lifecycle of timeline storage:
-/// <list type="bullet">
-/// <item>Automatically appends the <c>.gittrace</c> extension when saving or loading files.</item>
-/// <item>Delegates serialization to <see cref="ISerializer{T}"/> for <see cref="Timeline"/>.</item>
-/// <item>Delegates file I/O to <see cref="IFileManager"/>.</item>
-/// <item>Returns <see cref="Result"/> or <see cref="Result{T}"/> objects to encapsulate success or failure without throwing exceptions.</item>
-/// <item>Designed as a singleton service for dependency injection with <see cref="ServiceLifetime.Singleton"/>.</item>
-/// </list>
-/// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
-internal sealed class TimelineRepositoryMsgPack(
+internal sealed partial class TimelineRepositoryMsgPack(
     ILogger<TimelineRepositoryMsgPack> logger,
     ISerializer<Timeline> serializer,
     IFileManager fileManager)
-    : ITimelineRepository
+    : ITimelineRepository, IStreamingTimelineRepository
 {
     private const string FileExtension = ".gittrace";
 
     /// <summary>
-    /// Saves the given <paramref name="timeline"/> to the specified <paramref name="filePath"/>.
-    /// Automatically creates the directory if it does not exist.
+    /// Saves a timeline to disk.
     /// </summary>
-    /// <param name="timeline">The timeline to persist.</param>
-    /// <param name="filePath">The file path where the timeline should be saved.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>
-    /// A <see cref="Result"/> indicating success or failure. 
-    /// On failure, contains the error message and exception.
-    /// </returns>
     public async Task<Result> SaveAsync(Timeline timeline, string filePath, CancellationToken cancellationToken = default)
     {
         try
         {
             filePath = fileManager.EnsureExtension(filePath, FileExtension);
             logger.LogInformation("Saving timeline to {Path}", filePath);
-            var bytes = await serializer.SerializeAsync(timeline, cancellationToken);
-            await fileManager.SaveAsync(filePath, bytes, cancellationToken);
+            var byteLength = await WriteTimelineAsync(filePath, timeline, cancellationToken);
 
-        logger.LogInformation("Timeline saved successfully ({Length} bytes)", bytes.Length);
-            
-            
-            if ((logger.IsEnabled(LogLevel.Debug) || logger.GetType().Name.StartsWith("NullLogger")) && timeline.Events.Count <= 50000)
-            {
-                var debugObject = new
-                {
-                    Repository = timeline.RepositoryId != null
-                        ? new
-                        {
-                            timeline.RepositoryId.Owner,
-                            timeline.RepositoryId.Name
-                        }
-                        : null,
-                    EventCount = timeline.Events.Count,
-                    Events = timeline.Events.Select(evt => new
-                    {
-                        Timestamp = evt.Core.Timestamp.UnixSeconds,
-                        Actor = evt.Core.Actor?.Value,
-                        Branch = evt.Branch?.Name?.Value,
-                        BranchType = evt.Branch?.Type,
-                        CommitSha = evt.Commit?.Sha?.Value,
-                        CommitType = evt.Commit?.Type,
-                        FilePath = evt.Metadata?.FilePath?.Value,
-                        MetadataMessage = evt.Metadata?.Metadata,
-                        Target = evt.Target
-                    }).ToList()
-                };
-                var json = System.Text.Json.JsonSerializer.Serialize(
-                    debugObject,
-                    new System.Text.Json.JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    });
+            logger.LogInformation("Timeline saved successfully ({Length} bytes)", byteLength);
 
-                var debugPath = filePath + ".debug.json";
-                await File.WriteAllTextAsync(debugPath, json, cancellationToken);
-            }
-            
+            if (ShouldWriteDebugSnapshot(timeline))
+                await WriteDebugSnapshotAsync(timeline, filePath, cancellationToken);
+
             return Result.Success();
         }
         catch (Exception ex)
@@ -101,22 +53,77 @@ internal sealed class TimelineRepositoryMsgPack(
     }
 
     /// <summary>
-    /// Loads a <see cref="Timeline"/> from the specified <paramref name="filePath"/>.
+    /// Streams commits into a timeline file.
     /// </summary>
-    /// <param name="filePath">The file path to load the timeline from.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>
-    /// A <see cref="Result{Timeline}"/> containing the loaded timeline on success,
-    /// or failure information if loading or deserialization fails.
-    /// </returns>
+    public async Task<Result> SaveAsync(
+        IAsyncEnumerable<CommitData> commits,
+        string filePath,
+        TimelineBuilderOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        string? tempEventsPath = null;
+
+        try
+        {
+            filePath = fileManager.EnsureExtension(filePath, FileExtension);
+            logger.LogInformation("Streaming timeline save to {Path}", filePath);
+
+            tempEventsPath = Path.Combine(
+                Path.GetTempPath(),
+                "ChangeTrace",
+                "timeline-events",
+                $"{Guid.NewGuid():N}.bin");
+
+            var eventCount = await WriteEventPayloadAsync(
+                commits,
+                tempEventsPath,
+                options,
+                cancellationToken);
+
+            await using var outputStream = await fileManager.OpenWriteAsync(filePath, cancellationToken);
+            await WriteTimelinePayloadAsync(
+                outputStream,
+                tempEventsPath,
+                eventCount,
+                options.RepositoryId,
+                cancellationToken);
+
+            logger.LogInformation("Timeline streamed successfully ({Count} events)", eventCount);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to stream save timeline");
+            return Result.Failure("Failed to save timeline", ex);
+        }
+        finally
+        {
+            if (tempEventsPath is not null && File.Exists(tempEventsPath))
+                File.Delete(tempEventsPath);
+        }
+    }
+
+    /// <summary>
+    /// Loads a timeline from disk.
+    /// </summary>
     public async Task<Result<Timeline>> LoadAsync(string filePath, CancellationToken cancellationToken = default)
     {
         try
         {
             logger.LogInformation("Loading timeline from {Path}", filePath);
 
-            var bytes = await fileManager.LoadAsync(filePath, cancellationToken);
-            var timeline = await serializer.DeserializeAsync(bytes, cancellationToken);
+            Timeline timeline;
+
+            if (serializer is IStreamingSerializer<Timeline> streamingSerializer)
+            {
+                await using var stream = await fileManager.OpenReadAsync(filePath, cancellationToken);
+                timeline = await streamingSerializer.DeserializeAsync(stream, cancellationToken);
+            }
+            else
+            {
+                var bytes = await fileManager.LoadAsync(filePath, cancellationToken);
+                timeline = await serializer.DeserializeAsync(bytes, cancellationToken);
+            }
 
             logger.LogInformation("Timeline loaded: {Count} events", timeline.Count);
             return Result<Timeline>.Success(timeline);
@@ -125,6 +132,123 @@ internal sealed class TimelineRepositoryMsgPack(
         {
             logger.LogError(ex, "Failed to load timeline");
             return Result<Timeline>.Failure("Failed to load timeline", ex);
+        }
+    }
+
+    private async Task<long> WriteTimelineAsync(
+        string filePath,
+        Timeline timeline,
+        CancellationToken cancellationToken)
+    {
+        if (serializer is IStreamingSerializer<Timeline> streamingSerializer)
+            return await WriteTimelineStreamAsync(filePath, timeline, streamingSerializer, cancellationToken);
+
+        return await WriteTimelineBufferAsync(filePath, timeline, cancellationToken);
+    }
+
+    private async Task<long> WriteTimelineStreamAsync(
+        string filePath,
+        Timeline timeline,
+        IStreamingSerializer<Timeline> streamingSerializer,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = await fileManager.OpenWriteAsync(filePath, cancellationToken);
+        await streamingSerializer.SerializeAsync(stream, timeline, cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+
+        return stream.CanSeek ? stream.Length : -1;
+    }
+
+    private async Task<long> WriteTimelineBufferAsync(
+        string filePath,
+        Timeline timeline,
+        CancellationToken cancellationToken)
+    {
+        var bytes = await serializer.SerializeAsync(timeline, cancellationToken);
+        await fileManager.SaveAsync(filePath, bytes, cancellationToken);
+        return bytes.Length;
+    }
+
+    private async Task<int> WriteEventPayloadAsync(
+        IAsyncEnumerable<CommitData> commits,
+        string tempEventsPath,
+        TimelineBuilderOptions options,
+        CancellationToken cancellationToken)
+    {
+        await using var tempStream = await fileManager.OpenWriteAsync(tempEventsPath, cancellationToken);
+        var writer = new EventPayloadWriter(tempStream);
+        var branchTracker = options.IncludeBranchEvents
+            ? new BranchTracker()
+            : null;
+        var commitCount = 0;
+
+        await foreach (var commit in commits.WithCancellation(cancellationToken))
+        {
+            TimelineEventEmitter.EmitCommitEvents(
+                commit,
+                options,
+                branchTracker,
+                writer.Write);
+
+            commitCount++;
+            if (commitCount % 50000 == 0)
+                logger.LogInformation("Stream-saved {Count} commits...", commitCount);
+        }
+
+        await tempStream.FlushAsync(cancellationToken);
+        return writer.EventCount;
+    }
+
+    private static async Task WriteTimelinePayloadAsync(
+        Stream outputStream,
+        string tempEventsPath,
+        int eventCount,
+        RepositoryId? repositoryId,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new ArrayBufferWriter<byte>(256);
+        var writer = new MessagePackWriter(buffer);
+        writer.WriteArrayHeader(4);
+        writer.WriteNil();
+        TimelineMessagePackFormatter.WriteRepositoryId(ref writer, repositoryId);
+        writer.WriteArrayHeader(eventCount);
+        writer.Flush();
+
+        await outputStream.WriteAsync(buffer.WrittenMemory, cancellationToken);
+
+        await using (var tempReadStream = new FileStream(
+                         tempEventsPath,
+                         FileMode.Open,
+                         FileAccess.Read,
+                         FileShare.Read,
+                         131072,
+                         FileOptions.Asynchronous | FileOptions.SequentialScan))
+        {
+            await tempReadStream.CopyToAsync(outputStream, 131072, cancellationToken);
+        }
+
+        buffer.Clear();
+        writer = new MessagePackWriter(buffer);
+        writer.Write(false);
+        writer.Flush();
+        await outputStream.WriteAsync(buffer.WrittenMemory, cancellationToken);
+        await outputStream.FlushAsync(cancellationToken);
+    }
+
+    private sealed class EventPayloadWriter(Stream stream)
+    {
+        private readonly ArrayBufferWriter<byte> _buffer = new(1024);
+
+        public int EventCount { get; private set; }
+
+        public void Write(TraceEvent traceEvent)
+        {
+            _buffer.Clear();
+            var writer = new MessagePackWriter(_buffer);
+            TimelineMessagePackFormatter.WriteEvent(ref writer, traceEvent);
+            writer.Flush();
+            stream.Write(_buffer.WrittenSpan);
+            EventCount++;
         }
     }
 }

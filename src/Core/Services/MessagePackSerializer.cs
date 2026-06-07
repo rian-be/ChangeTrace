@@ -21,7 +21,7 @@ namespace ChangeTrace.Core.Services;
 /// </list>
 /// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
-internal sealed class MessagePackSerializer<T> : ISerializer<T>
+internal sealed class MessagePackSerializer<T> : ISerializer<T>, IStreamingSerializer<T>
 {
     private readonly MessagePackSerializerOptions _options;
 
@@ -46,11 +46,10 @@ internal sealed class MessagePackSerializer<T> : ISerializer<T>
     /// <param name="obj">Object to serialize.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Byte array representing serialized object.</returns>
-    public async Task<byte[]> SerializeAsync(T obj, CancellationToken ct = default)
+    public Task<byte[]> SerializeAsync(T obj, CancellationToken ct = default)
     {
-        await using var ms = new MemoryStream();
-        await MessagePackSerializer.SerializeAsync(ms, obj, _options, ct);
-        return ms.ToArray();
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(MessagePackSerializer.Serialize(obj, _options));
     }
 
     /// <summary>
@@ -59,9 +58,27 @@ internal sealed class MessagePackSerializer<T> : ISerializer<T>
     /// <param name="data">Byte array to deserialize.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Deserialized object of type <typeparamref name="T"/>.</returns>
-    public async Task<T> DeserializeAsync(byte[] data, CancellationToken ct = default)
+    public Task<T> DeserializeAsync(byte[] data, CancellationToken ct = default)
     {
-        await using var ms = new MemoryStream(data);
-        return await MessagePackSerializer.DeserializeAsync<T>(ms, _options, ct);
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(MessagePackSerializer.Deserialize<T>(data, _options));
+    }
+
+    /// <summary>
+    /// Serializes an object directly into a stream.
+    /// </summary>
+    public async Task SerializeAsync(Stream destination, T obj, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await MessagePackSerializer.SerializeAsync(destination, obj, _options, ct);
+    }
+
+    /// <summary>
+    /// Deserializes an object directly from a stream.
+    /// </summary>
+    public async Task<T> DeserializeAsync(Stream source, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await MessagePackSerializer.DeserializeAsync<T>(source, _options, ct);
     }
 }

@@ -38,6 +38,42 @@ internal sealed class FileManager : IFileManager
         => File.ReadAllBytesAsync(path, cancellationToken);
 
     /// <summary>
+    /// Opens a writable file stream and ensures the target directory exists first.
+    /// </summary>
+    public Task<Stream> OpenWriteAsync(string path, CancellationToken cancellationToken = default)
+    {
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
+        Stream stream = new FileStream(
+            path,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 131072,
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        return Task.FromResult(stream);
+    }
+
+    /// <summary>
+    /// Opens a readable file stream for sequential reads.
+    /// </summary>
+    public Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+    {
+        Stream stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 131072,
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        return Task.FromResult(stream);
+    }
+
+    /// <summary>
     /// Checks if file exists at path.
     /// </summary>
     /// <param name="path">File path to check.</param>

@@ -18,6 +18,12 @@ internal sealed record TimelineDto
 
     internal static TimelineDto FromDomain(Timeline timeline)
     {
+        var eventsSpan = timeline.EventsSpan;
+        var events = new List<TraceEventDto>(eventsSpan.Length);
+
+        for (var index = 0; index < eventsSpan.Length; index++)
+            events.Add(TraceEventDto.FromDomain(eventsSpan[index]));
+
         return new TimelineDto
         {
             RepositoryId = timeline.RepositoryId is not null
@@ -25,10 +31,7 @@ internal sealed record TimelineDto
                     timeline.RepositoryId.Owner,
                     timeline.RepositoryId.Name)
                 : null,
-
-            Events = timeline.Events
-                .Select(TraceEventDto.FromDomain)
-                .ToList(),
+            Events = events,
 
             IsNormalized = IsTimelineNormalized(timeline)
         };
@@ -42,11 +45,11 @@ internal sealed record TimelineDto
                 RepositoryId.Name).ValueOrNull
             : null;
 
-        var timeline = new Timeline(repositoryId);
+        var timeline = new Timeline(repositoryId, Events.Count);
 
-        foreach (var eventDto in Events)
+        for (var index = 0; index < Events.Count; index++)
         {
-            if (eventDto.ToDomain() is { } traceEvent)
+            if (Events[index].ToDomain() is { } traceEvent)
                 timeline.AddEvent(traceEvent);
         }
 

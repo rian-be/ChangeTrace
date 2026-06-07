@@ -1,5 +1,6 @@
 using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Timelines;
+using ChangeTrace.Cli.Services;
 
 namespace ChangeTrace.Cli.Commands.Debug;
 
@@ -22,9 +23,7 @@ internal static class TimelineLoader
 
         try
         {
-            var data = await File.ReadAllBytesAsync(filePath, ct);
-            var timeline = await serializer.DeserializeAsync(data, ct);
-            return timeline;
+            return await TimelineFileLoader.LoadAsync(serializer, filePath, ct);
         }
         catch (Exception ex)
         {
