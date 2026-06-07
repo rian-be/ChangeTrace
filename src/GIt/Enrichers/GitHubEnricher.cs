@@ -82,8 +82,12 @@ internal sealed class GitHubEnricher : BasePlatformEnricher, IProviderTimelineEn
                 var prType = MapPrState(pr.Merged, pr.State.StringValue);
                 var metadata = $"PR#{pr.Number} by {pr.User.Login} -> {pr.Base.Ref}";
 
-                EnrichTraceEventWithPr(targetEvent.Value, prNumber, prType, metadata);
-                matched++;
+                var updated = timeline.TryUpdateFirst(
+                    evt => evt.Equals(targetEvent.Value),
+                    evt => EnrichTraceEventWithPr(evt, prNumber, prType, metadata));
+
+                if (updated)
+                    matched++;
             }
 
             Logger.LogInformation("Enrichment complete: {Matched}/{Total} matched", matched, allPRs.Count);

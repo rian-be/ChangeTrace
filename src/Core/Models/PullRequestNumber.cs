@@ -22,6 +22,9 @@ internal readonly record struct PullRequestNumber
          value <= 0? Result<PullRequestNumber>.Failure("PR number must be positive") 
              :  Result<PullRequestNumber>.Success(new PullRequestNumber(value));
 
+    internal static PullRequestNumber FromTrustedSerialized(int value)
+        => new(value);
+
     public override string ToString() => $"#{Value}";
     public static implicit operator int(PullRequestNumber pr) => pr.Value;
 }

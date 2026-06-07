@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using ChangeTrace.Configuration.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ChangeTrace.CredentialTrace.Providers;
+namespace ChangeTrace.CredentialTrace.Providers.DeviceFlow;
 
 /// <summary>
 /// Authentication provider for GitLab using the OAuth device authorization flow.
@@ -16,7 +16,14 @@ internal sealed class GitLabDeviceFlowProvider(HttpClient http) : BaseDeviceFlow
     public override string Name => "gitlab";
 
     /// <summary>
-    /// Gets the display name used in logs and prompts.
+    /// Gets whether the provider is configured.
+    /// </summary>
+    public override bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CHANGETRACE_GITLAB_CLIENT_ID"))
+        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CHANGETRACE_GITLAB_DEVICE_FLOW__CLIENTID"));
+
+    /// <summary>
+    /// Gets the display name used in prompts and logs.
     /// </summary>
     protected override string DisplayName => "GitLab";
 
@@ -60,6 +67,9 @@ internal sealed class GitLabDeviceFlowProvider(HttpClient http) : BaseDeviceFlow
         return response.IsSuccessStatusCode;
     }
 
+    /// <summary>
+    /// Resolves the base URL.
+    /// </summary>
     private string ResolveBaseUrl()
     {
         var baseUrl = Environment.GetEnvironmentVariable("CHANGETRACE_GITLAB_BASE_URL")

@@ -40,20 +40,22 @@ internal sealed class LoginCommandHandler(
 
         if (string.IsNullOrWhiteSpace(provider))
             return;
-        
+
         AuthSession session;
         try
         {
-            session = await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .SpinnerStyle(Style.Parse("blue"))
-                .StartAsync($"Logging into [bold]{provider}[/]...", async ctx =>
-                {
-                    var s = await auth.FetchSession(provider, ct);
-                    ctx.Status("Finalizing login...");
-                    await Task.Delay(300, ct); 
-                    return s;
-                });
+            session = ShouldUseStatus(provider)
+                ? await AnsiConsole.Status()
+                    .Spinner(Spinner.Known.Dots)
+                    .SpinnerStyle(Style.Parse("blue"))
+                    .StartAsync($"Logging into [bold]{provider}[/]...", async ctx =>
+                    {
+                        var s = await auth.FetchSession(provider, ct);
+                        ctx.Status("Finalizing login...");
+                        await Task.Delay(300, ct);
+                        return s;
+                    })
+                : await auth.FetchSession(provider, ct);
         }
         catch (Exception ex)
         {
@@ -88,4 +90,7 @@ internal sealed class LoginCommandHandler(
                 .Padding(1, 1)
         );
     }
+
+    private static bool ShouldUseStatus(string provider)
+        => !string.Equals(provider, "custom", StringComparison.OrdinalIgnoreCase);
 }

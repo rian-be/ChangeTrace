@@ -37,6 +37,8 @@ namespace ChangeTrace.GIt.Options;
 internal sealed record ExportOptions
 {
     public string? GitHubToken { get; init; }
+    public string? GitLabToken { get; init; }
+    public string GitLabBaseUrl { get; init; } = "https://gitlab.com";
     public bool IncludeFileChanges { get; init; } = true;
     public bool IncludeBranchEvents { get; init; } = true;
     public bool IncludeMergeDetection { get; init; } = true;

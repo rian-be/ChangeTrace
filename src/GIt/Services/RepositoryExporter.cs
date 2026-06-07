@@ -71,7 +71,7 @@ internal sealed class RepositoryExporter(
             progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
 
             // Step 4 and 5 Enrich with PR data & Normalize
-            var enrichResult = await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
+        var enrichResult = await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
             if (enrichResult.IsFailure)
                 return Result<Timeline>.Failure(enrichResult.Error!);
 
@@ -304,7 +304,7 @@ internal sealed class RepositoryExporter(
         if (!options.EnrichWithPullRequests)
             return Result.Success();
 
-        var providerResult = TryDetectProvider(pathOrUrl);
+        var providerResult = TryDetectProvider(pathOrUrl, options);
         if (providerResult.IsFailure)
             return Result.Failure(providerResult.Error!);
 
@@ -338,7 +338,7 @@ internal sealed class RepositoryExporter(
             : Result.Failure(enrichResult.Error!);
     }
 
-    private static Result<string?> TryDetectProvider(string pathOrUrl)
+    private static Result<string?> TryDetectProvider(string pathOrUrl, ExportOptions options)
     {
         if (!IsGitUrl(pathOrUrl))
             return Result<string?>.Success(null);
@@ -349,12 +349,39 @@ internal sealed class RepositoryExporter(
         }
         catch (NotSupportedException ex)
         {
+            if (IsGitLabRepository(pathOrUrl, options.GitLabBaseUrl))
+                return Result<string?>.Success("gitlab");
+
             return Result<string?>.Failure(ex.Message);
         }
         catch (Exception ex)
         {
             return Result<string?>.Failure($"Unable to detect repository provider: {ex.Message}", ex);
         }
+    }
+
+    private static bool IsGitLabRepository(string pathOrUrl, string gitLabBaseUrl)
+    {
+        var expectedHost = TryExtractHost(gitLabBaseUrl);
+        var actualHost = TryExtractHost(pathOrUrl);
+
+        return expectedHost is not null
+               && actualHost is not null
+               && string.Equals(expectedHost, actualHost, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? TryExtractHost(string repository)
+    {
+        if (Uri.TryCreate(repository, UriKind.Absolute, out var uri))
+            return uri.Host;
+
+        var atIndex = repository.IndexOf('@');
+        var colonIndex = repository.IndexOf(':');
+
+        if (atIndex < 0 || colonIndex <= atIndex)
+            return null;
+
+        return repository.Substring(atIndex + 1, colonIndex - atIndex - 1);
     }
 
     /// <summary>

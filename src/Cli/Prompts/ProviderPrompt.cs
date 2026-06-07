@@ -13,10 +13,13 @@ internal static class ProviderPrompt
     /// </summary>
     public static string? SelectProvider(IEnumerable<IAuthProvider> providers)
     {
-        var choices = providers
+        var names = providers
+            .Where(p => p.IsConfigured)
             .Select(p => p.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var choices = names
             .OrderBy(name => name)
             .ToArray();
 

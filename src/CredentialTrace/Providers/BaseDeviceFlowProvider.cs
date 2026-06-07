@@ -12,7 +12,7 @@ namespace ChangeTrace.CredentialTrace.Providers;
 internal abstract class BaseDeviceFlowProvider(HttpClient http) : IValidatableAuthProvider
 {
     /// <summary>
-    /// Gets the provider name.
+    /// Gets the shared HTTP client.
     /// </summary>
     protected HttpClient Http { get; } = http;
 
@@ -20,6 +20,11 @@ internal abstract class BaseDeviceFlowProvider(HttpClient http) : IValidatableAu
     /// Gets the provider name.
     /// </summary>
     public abstract string Name { get; }
+
+    /// <summary>
+    /// Gets whether the provider is configured.
+    /// </summary>
+    public abstract bool IsConfigured { get; }
 
     /// <summary>
     /// Gets the display name used in logs and prompts.
@@ -181,6 +186,9 @@ internal abstract class BaseDeviceFlowProvider(HttpClient http) : IValidatableAu
         AnsiConsole.WriteLine();
     }
 
+    /// <summary>
+    /// Resolves the client id.
+    /// </summary>
     private string ResolveClientId()
     {
         var clientId = Environment.GetEnvironmentVariable(ClientIdEnvironmentVariable);

@@ -278,7 +278,7 @@ internal sealed class TimelineMessagePackFormatter : IMessagePackFormatter<Timel
         var path = FilePath.FromTrustedSerialized(filePath);
         var type = DecodeCommitType(commitType);
 
-        return path != null && type != null
+        return type != null
             ? TraceEventFactory.FileChange(timestamp, actor, path, type.Value, sha, metadata)
             : null;
     }

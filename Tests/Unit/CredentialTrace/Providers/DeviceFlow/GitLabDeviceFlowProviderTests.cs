@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http;
-using ChangeTrace.CredentialTrace.Providers;
+using ChangeTrace.CredentialTrace.Providers.DeviceFlow;
 using Xunit;
 
-namespace ChangeTrace.Tests.CredentialTrace.Providers;
+namespace ChangeTrace.Tests.CredentialTrace.Providers.DeviceFlow;
 
 public sealed class GitLabDeviceFlowProviderTests
 {

@@ -60,6 +60,38 @@ internal sealed class Timeline(RepositoryId? repositoryId, int initialCapacity =
         _events.Add(evt);
 
     /// <summary>
+    /// Updates an event at the specified index.
+    /// </summary>
+    internal bool TryUpdateAt(int index, Func<TraceEvent, TraceEvent> updater)
+    {
+        if ((uint)index >= (uint)_events.Count)
+            return false;
+
+        _events[index] = updater(_events[index]);
+        return true;
+    }
+
+    /// <summary>
+    /// Replaces the first event matching the predicate.
+    /// </summary>
+    internal bool TryUpdateFirst(
+        Func<TraceEvent, bool> predicate,
+        Func<TraceEvent, TraceEvent> updater)
+    {
+        for (var index = 0; index < _events.Count; index++)
+        {
+            var current = _events[index];
+            if (!predicate(current))
+                continue;
+
+            _events[index] = updater(current);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Adds multiple events to the timeline.
     /// </summary>
     /// <param name="events">Events to add.</param>

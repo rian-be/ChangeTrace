@@ -60,7 +60,7 @@ internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
         System.Diagnostics.Debug.WriteLine(
             $"[PR ENRICH START] Target={traceEvent.Target}");
 
-        var pr = PullRequestNumber.Create(prNumber).Value;
+        var pr = PullRequestNumber.FromTrustedSerialized(prNumber);
 
         var withPr = traceEvent.WithPullRequest(pr, prType);
 

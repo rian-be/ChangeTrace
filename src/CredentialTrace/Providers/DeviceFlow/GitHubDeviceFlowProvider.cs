@@ -1,9 +1,8 @@
 using System.Net.Http.Headers;
 using ChangeTrace.Configuration.Discovery;
-using ChangeTrace.CredentialTrace.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ChangeTrace.CredentialTrace.Providers;
+namespace ChangeTrace.CredentialTrace.Providers.DeviceFlow;
 
 /// <summary>
 /// Authentication provider for GitHub using the OAuth device authorization flow.
@@ -17,7 +16,13 @@ internal sealed class GitHubDeviceFlowProvider(HttpClient http) : BaseDeviceFlow
     public override string Name => "github";
 
     /// <summary>
-    /// Gets the display name used in logs and prompts.
+    /// Gets whether the provider is configured.
+    /// </summary>
+    public override bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CHANGETRACE_GITHUB_CLIENT_ID"));
+
+    /// <summary>
+    /// Gets the display name used in prompts and logs.
     /// </summary>
     protected override string DisplayName => "GitHub";
 

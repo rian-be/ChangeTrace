@@ -19,6 +19,11 @@ internal interface IAuthProvider
     string Name { get; }
 
     /// <summary>
+    /// Gets whether the provider is configured and available to the user.
+    /// </summary>
+    bool IsConfigured { get; }
+
+    /// <summary>
     /// Performs the login operation asynchronously and returns an <see cref="AuthSession"/>.
     /// </summary>
     /// <param name="ct">Cancellation token to cancel the login operation.</param>

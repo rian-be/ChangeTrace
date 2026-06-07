@@ -8,90 +8,105 @@ namespace ChangeTrace.Tests.CredentialTrace.Services;
 /// <summary>Tests authenticated session reuse, validation, and replacement behavior.</summary>
 public sealed class AuthServiceTests
 {
-    /// <summary>FetchSession returns an existing valid session without invoking provider login.</summary>
     [Fact]
     public async Task FetchSession_ReturnsExistingValidSessionWithoutLogin()
     {
-        var existing = AuthSession.Create("github", "valid-token", "rian");
+        var existing = AuthSession.Create("codeberg", "valid-token", "rian");
         var store = new InMemoryTokenStore(existing);
-        var provider = new TestAuthProvider("github", AuthSession.Create("github", "new-token"), isValid: true);
+        var provider = new TestAuthProvider("codeberg", AuthSession.Create("codeberg", "new-token"), isValid: true);
         var service = new AuthService([provider], store);
 
-        var session = await service.FetchSession("GitHub");
+        var session = await service.FetchSession("codeberg");
 
         Assert.Same(existing, session);
         Assert.Equal(0, provider.LoginCount);
     }
 
-    /// <summary>FetchSession removes an invalid stored session and persists the provider login result.</summary>
+    [Fact]
+    public async Task FetchSession_ReturnsExistingCodebergSessionWithoutLogin()
+    {
+        var existing = AuthSession.Create("codeberg", "valid-token", "rian");
+        var store = new InMemoryTokenStore(existing);
+        var provider = new TestAuthProvider("codeberg", AuthSession.Create("codeberg", "new-token"), isValid: true);
+        var service = new AuthService([provider], store);
+
+        var session = await service.FetchSession("codeberg");
+
+        Assert.Same(existing, session);
+        Assert.Equal(0, provider.LoginCount);
+    }
+
+    [Fact]
+    public async Task FetchSession_ReturnsExistingCustomSessionWithoutLogin()
+    {
+        var existing = AuthSession.Create("custom:example.com", "valid-token", "rian");
+        var store = new InMemoryTokenStore(existing);
+        var provider = new TestAuthProvider("custom", AuthSession.Create("custom:example.com", "new-token"), isValid: true);
+        var service = new AuthService([provider], store);
+
+        var session = await service.FetchSession("custom");
+
+        Assert.Same(existing, session);
+        Assert.Equal(0, provider.LoginCount);
+    }
+
     [Fact]
     public async Task FetchSession_RemovesInvalidSessionAndPersistsNewLogin()
     {
-        var existing = AuthSession.Create("github", "expired-token", "rian");
-        var replacement = AuthSession.Create("github", "fresh-token", "rian");
+        var existing = AuthSession.Create("codeberg", "expired-token", "rian");
+        var replacement = AuthSession.Create("codeberg", "fresh-token", "rian");
         var store = new InMemoryTokenStore(existing);
-        var provider = new TestAuthProvider("github", replacement, isValid: false);
+        var provider = new TestAuthProvider("codeberg", replacement, isValid: false);
         var service = new AuthService([provider], store);
 
-        var session = await service.FetchSession("github");
+        var session = await service.FetchSession("codeberg");
 
         Assert.Same(replacement, session);
         Assert.Equal(1, provider.LoginCount);
-        Assert.Same(replacement, await store.GetAsync("github"));
-        Assert.Equal(["github"], store.RemovedProviders);
+        Assert.Same(replacement, await store.GetAsync("codeberg"));
+        Assert.Equal(["codeberg"], store.RemovedProviders);
     }
 
-    /// <summary>Test auth provider that records login calls and returns a configurable validation result.</summary>
     private sealed class TestAuthProvider(
         string name,
         AuthSession loginSession,
         bool isValid)
         : IValidatableAuthProvider
     {
-        /// <summary>Provider name matched by AuthService.</summary>
         public string Name { get; } = name;
-
-        /// <summary>Number of times LoginAsync was invoked.</summary>
+        public bool IsConfigured => true;
         public int LoginCount { get; private set; }
 
-        /// <summary>Returns the configured login session and increments LoginCount.</summary>
         public Task<AuthSession> LoginAsync(CancellationToken ct = default)
         {
             LoginCount++;
             return Task.FromResult(loginSession);
         }
 
-        /// <summary>Returns the configured validation result for any token.</summary>
         public Task<bool> ValidateTokenAsync(string token, CancellationToken ct = default)
             => Task.FromResult(isValid);
     }
 
-    /// <summary>In-memory token store used to assert AuthService persistence behavior.</summary>
     private sealed class InMemoryTokenStore(params AuthSession[] sessions) : ITokenStore
     {
         private readonly Dictionary<string, AuthSession> _sessions = sessions.ToDictionary(
             session => session.Provider,
             StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Providers removed through RemoveAsync, in call order.</summary>
         public List<string> RemovedProviders { get; } = [];
 
-        /// <summary>Saves or replaces <paramref name="session"/> by provider.</summary>
         public Task SaveAsync(AuthSession session, CancellationToken ct = default)
         {
             _sessions[session.Provider] = session;
             return Task.CompletedTask;
         }
 
-        /// <summary>Returns the session stored for provider, if present.</summary>
         public Task<AuthSession?> GetAsync(string provider, CancellationToken ct = default)
             => Task.FromResult(_sessions.GetValueOrDefault(provider));
 
-        /// <summary>Returns all sessions currently stored in memory.</summary>
         public Task<IReadOnlyList<AuthSession>> ListAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AuthSession>>(_sessions.Values.ToArray());
 
-        /// <summary>Removes a provider session and records the provider name.</summary>
         public Task RemoveAsync(string provider, CancellationToken ct = default)
         {
             RemovedProviders.Add(provider);

@@ -37,7 +37,7 @@ internal sealed class LoginCommand : ICliCommand
 
         var provider = new Option<string?>("--provider", "-p")
         {
-            Description = "Authentication provider (github, gitlab, etc)"
+            Description = "Authentication provider (github, gitlab, codeberg, custom)"
         };
 
         cmd.Options.Add(provider);
