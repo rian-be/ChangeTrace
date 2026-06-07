@@ -1,5 +1,6 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
+using ChangeTrace.Cli.Prompts;
 using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace;
@@ -21,7 +22,9 @@ namespace ChangeTrace.Cli.Handlers.Auth;
 /// </list>
 /// </remarks>
 [AutoRegister(ServiceLifetime.Transient, typeof(LoginCommandHandler))]
-internal sealed class LoginCommandHandler(IAuthService auth) : ICliHandler
+internal sealed class LoginCommandHandler(
+    IAuthService auth,
+    IEnumerable<IAuthProvider> providers) : ICliHandler
 {
     /// <summary>
     /// Executes 'login' command asynchronously.
@@ -30,7 +33,13 @@ internal sealed class LoginCommandHandler(IAuthService auth) : ICliHandler
     /// <param name="ct">Cancellation token.</param>
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
-        var provider = parseResult.GetValue<string>("provider")!;
+        var provider = parseResult.GetValue<string>("--provider");
+
+        if (string.IsNullOrWhiteSpace(provider))
+            provider = ProviderPrompt.SelectProvider(providers);
+
+        if (string.IsNullOrWhiteSpace(provider))
+            return;
         
         AuthSession session;
         try

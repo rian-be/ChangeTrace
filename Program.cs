@@ -1,5 +1,6 @@
 using ChangeTrace.Cli.Extensions;
 using ChangeTrace.Configuration;
+using dotenv.net;
 using ChangeTrace.Rendering.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,16 @@ public static class Program
     public static async Task<int> Main(string[] args)
     {
         GLFWProvider.CheckForMainThread = false;
+        DotEnv.Fluent()
+            .WithoutExceptions()
+            .WithoutOverwriteExistingVars()
+            .WithEnvFiles(
+                ".env",
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".changetrace",
+                    ".env"))
+            .Load();
 
         var services = new ServiceCollection();
      //   services.ConfigureApp(logLevel: LogLevel.Information);

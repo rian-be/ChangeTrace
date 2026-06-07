@@ -14,7 +14,7 @@ namespace ChangeTrace.Cli.Commands.Auth;
 /// <list type="bullet">
 /// <item>Implements <see cref="ICliCommand"/> to provide a <see cref="Command"/> instance for registration.</item>
 /// <item>Exposes <see cref="HandlerType"/> pointing to <see cref="LoginCommandHandler"/> which performs the actual login.</item>
-/// <item>Defines a single argument to specify the provider (e.g., GitHub, GitLab).</item>
+/// <item>Accepts an optional provider argument and falls back to a selector when omitted.</item>
 /// <item>Can be automatically registered as a singleton via <see cref="AutoRegisterAttribute"/>.</item>
 /// </list>
 /// </remarks>
@@ -30,13 +30,17 @@ internal sealed class LoginCommand : ICliCommand
     /// <summary>
     /// Builds the <see cref="Command"/> instance representing the 'login' command.
     /// </summary>
-    /// <returns>A fully configured <see cref="Command"/> with arguments.</returns>
+    /// <returns>A fully configured <see cref="Command"/>.</returns>
     public Command Build()
     {
         var cmd = new Command("login", "Login to provider");
 
-        var provider = new Argument<string>("provider") { Description = "Auth provider (github, gitlab, etc)" };
-        cmd.Arguments.Add(provider);
+        var provider = new Option<string?>("--provider", "-p")
+        {
+            Description = "Authentication provider (github, gitlab, etc)"
+        };
+
+        cmd.Options.Add(provider);
         return cmd;
     }
 }
