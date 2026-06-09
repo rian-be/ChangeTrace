@@ -55,6 +55,9 @@ internal sealed class TraceEventAggregationStage : IDisposable
         if (enabledEvents.HasFlag(RenderEventKinds.Merge))
             RegisterTrace(new MergeAggregator(CreateWriter<MergeEvent>()));
 
+        if (enabledEvents.HasFlag(RenderEventKinds.PullRequest))
+            RegisterTrace(new PullRequestAggregator(CreateWriter<PullRequestEvent>()));
+
         // COMMIT aggregators
 
         if (enabledEvents.HasFlag(RenderEventKinds.FileCoupling))

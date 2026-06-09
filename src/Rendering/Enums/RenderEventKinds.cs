@@ -27,12 +27,17 @@ internal enum RenderEventKinds
     Merge = 1 << 2,
 
     /// <summary>
+    /// Pull request events.
+    /// </summary>
+    PullRequest = 1 << 3,
+
+    /// <summary>
     /// File coupling or relationship events.
     /// </summary>
-    FileCoupling = 1 << 3,
+    FileCoupling = 1 << 4,
 
     /// <summary>
     /// All primary render event kinds.
     /// </summary>
-    All = Commit | Branch | Merge
+    All = Commit | Branch | Merge | PullRequest
 }

@@ -22,11 +22,11 @@ internal sealed class TranslationPipeline : ITranslationPipeline
         var pipeline = new TranslationPipeline();
 
         pipeline.Register(new CommitBundleTranslator(), priority: 5);
+        pipeline.Register(new PullRequestTranslator(), priority: 10);
         // pipeline.Register(new BranchTranslator(), priority: 10);
 
         // pipeline.Register(new CommitTranslator(), priority: 10);
         // pipeline.Register(new BranchTranslator(), priority: 10);
-        // pipeline.Register(new PullRequestTranslator(), priority: 10);
 
         return pipeline;
     }

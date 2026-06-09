@@ -248,6 +248,7 @@ internal sealed class RenderingPipeline : IRenderingPipeline
             CommitBundleEvent c => c.Timestamp,
             BranchEvent b => b.Timestamp,
             MergeEvent m => m.Timestamp,
+            PullRequestEvent p => p.Timestamp,
             FileCouplingEvent f => f.Timestamp,
             _ => throw new InvalidOperationException(
                 $"Unknown event type {typeof(TEvent)}")

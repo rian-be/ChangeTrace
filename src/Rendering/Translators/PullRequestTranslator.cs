@@ -1,6 +1,6 @@
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Enums;
-using ChangeTrace.Core.Events;
+using ChangeTrace.Core.Events.Semantic;
 using ChangeTrace.Rendering.Commands;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Interfaces;
@@ -23,32 +23,34 @@ namespace ChangeTrace.Rendering.Translators;
 /// </list>
 /// </remarks>
 [AutoRegister(ServiceLifetime.Singleton)]
-internal sealed class PullRequestTranslator // : IEventTranslator
+internal sealed class PullRequestTranslator : IEventTranslator
 {
+    /// <summary>
+    /// Event type handled by this translator.
+    /// </summary>
+    public Type EventType => typeof(PullRequestEvent);
+
     /// <summary>
     /// Determines whether this translator can handle a given event.
     /// </summary>
     /// <param name="evt">The event to evaluate.</param>
-    /// <returns>True if the event has pull request types; otherwise false.</returns>
-    public bool CanHandle(TraceEvent evt) => evt.PullRequest.HasValue;
+    /// <returns>True if the event is a pull request event; otherwise false.</returns>
+    public bool CanHandle(object evt) => evt is PullRequestEvent;
 
     /// <summary>
-    /// Translates <see cref="TraceEvent"/> representing pull request into one or more <see cref="RenderCommand"/> objects.
+    /// Translates <see cref="PullRequestEvent"/> into one or more <see cref="RenderCommand"/> objects.
     /// </summary>
     /// <param name="evt">The pull request event to translate.</param>
-    /// <returns>
-    /// A sequence of render commands representing the pull request badge, and optionally an edge and particle burst for merged PRs.
-    /// </returns>
-    public IEnumerable<RenderCommand> Translate(TraceEvent evt)
+    /// <returns>A sequence of render commands representing the pull request badge and optional merge effects.</returns>
+    public IEnumerable<RenderCommand> Translate(object evt)
     {
-        double timestamp = evt.TimeForPlayback;
-        var branch = evt.Branch?.Name.Value ?? evt.Target;
+        if (evt is not PullRequestEvent pullRequest)
+            return [];
 
-        var pullRequest = evt.PullRequest;
-        if (!pullRequest.HasValue) yield break;
-        var prNum = pullRequest.Value.Number.Value;
-
-        var action = pullRequest.Value.Type switch
+        var timestamp = pullRequest.Timestamp;
+        var branch = pullRequest.Branch;
+        var prNum = pullRequest.Number.Value;
+        var action = pullRequest.Type switch
         {
             PullRequestEventType.PullRequestCreated => PrBadgeAction.Open,
             PullRequestEventType.PullRequestMerged => PrBadgeAction.Merge,
@@ -56,11 +58,17 @@ internal sealed class PullRequestTranslator // : IEventTranslator
             _ => PrBadgeAction.Open
         };
 
-        yield return new PullRequestBadgeCommand(timestamp, branch, prNum, action);
+        var commands = new List<RenderCommand>
+        {
+            new PullRequestBadgeCommand(timestamp, branch, prNum, action)
+        };
 
-        if (pullRequest.Value.Type != PullRequestEventType.PullRequestMerged) yield break;
+        if (pullRequest.Type == PullRequestEventType.PullRequestMerged)
+        {
+          //  commands.Add(new EdgeCommand(timestamp, branch, pullRequest.Target, EdgeKind.PullRequest, Intensity: 1f));
+         //   commands.Add(new ParticleBurstCommand(timestamp, pullRequest.Target, ParticleCount: 80, ColorRgb: 0xA5D6A7));
+        }
 
-        yield return new EdgeCommand(timestamp, branch, evt.Target, EdgeKind.PullRequest, Intensity: 1f);
-        yield return new ParticleBurstCommand(timestamp, evt.Target, ParticleCount: 80, ColorRgb: 0xA5D6A7);
+        return commands;
     }
 }
