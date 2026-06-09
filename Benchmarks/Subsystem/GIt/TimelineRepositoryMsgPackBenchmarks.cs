@@ -3,6 +3,7 @@ using ChangeTrace.Benchmarks.Core.Fixtures;
 using ChangeTrace.Core.Services;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Services;
+using ChangeTrace.GIt.Services.Sidecars;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.Benchmarks.GIt.Benchmarks;
@@ -41,7 +42,9 @@ public class TimelineRepositoryMsgPackBenchmarks
         _repository = new TimelineRepositoryMsgPack(
             _loggerFactory.CreateLogger<TimelineRepositoryMsgPack>(),
             serializer,
-            fileManager);
+            fileManager,
+            new PullRequestSidecarHandler(_loggerFactory.CreateLogger<PullRequestSidecarHandler>(), fileManager),
+            new MergeSidecarHandler(_loggerFactory.CreateLogger<MergeSidecarHandler>(), fileManager));
 
         _timeline = TimelineBenchmarkFixture.Create(
             CommitCount,
