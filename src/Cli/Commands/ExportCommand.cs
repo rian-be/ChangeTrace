@@ -45,6 +45,14 @@ internal sealed class ExportCommand : ICliCommand
             Description = "Explicit output .gittrace path. When omitted, export is saved under the active workspace."
         };
         var tokenOpt = new Option<string?>("--token", "-r")  { Description = "GitHub personal access token" };
+        var enrichOpt = new Option<string?>("--enrich", "-e")
+        {
+            Description = "Choose PR enrichment scope: 'none' or 'pull-requests'. If omitted, you will be prompted."
+        };
+        var mergeOpt = new Option<bool?>("--merge-detection")
+        {
+            Description = "Enable merge detection. If omitted, you will be prompted."
+        };
         var verboseOpt = new Option<bool>("--verbose", "-v") { Description = "Enable verbose logging" };
         var gitCliOpt = new Option<bool>("--git-cli")
         {
@@ -58,6 +66,8 @@ internal sealed class ExportCommand : ICliCommand
         cmd.Arguments.Add(repoArg);
         cmd.Options.Add(outputOpt);
         cmd.Options.Add(tokenOpt);
+        cmd.Options.Add(enrichOpt);
+        cmd.Options.Add(mergeOpt);
         cmd.Options.Add(verboseOpt);
         cmd.Options.Add(gitCliOpt);
         cmd.Options.Add(noRenamesOpt);

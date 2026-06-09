@@ -6,6 +6,7 @@ using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.GIt.Enrichers;
@@ -17,7 +18,7 @@ namespace ChangeTrace.GIt.Enrichers;
 /// Provides logging, helper methods, and common functionality for enriching a <see cref="Timeline"/> 
 /// with platform-specific data, such as pull request events from GitHub, GitLab, etc.
 /// 
-/// All concrete enrichers must implement <see cref="EnrichAsync"/>.
+/// All concrete enrichers must implement <see cref="Enrich"/>.
 /// </remarks>
 
 internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
@@ -32,11 +33,13 @@ internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
     /// </summary>
     /// <param name="timeline">Timeline to enrich</param>
     /// <param name="repositoryId">Repository identifier</param>
+    /// <param name="options">Export options for the current export.</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>An <see cref="EnrichmentResult"/> wrapped in a <see cref="Result{T}"/></returns>
-    public abstract Task<Result<EnrichmentResult>> EnrichAsync(
+    public abstract Task<Result<EnrichmentResult>> Enrich(
         Timeline timeline,
         RepositoryId repositoryId,
+        ExportOptions options,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -57,9 +60,6 @@ internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
             traceEvent.Target,
             traceEvent.TimeForPlayback);
 
-        System.Diagnostics.Debug.WriteLine(
-            $"[PR ENRICH START] Target={traceEvent.Target}");
-
         var pr = PullRequestNumber.FromTrustedSerialized(prNumber);
 
         var withPr = traceEvent.WithPullRequest(pr, prType);
@@ -68,9 +68,6 @@ internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
             "PR attached | PR: {PrNumber} | Type: {Type}",
             prNumber,
             prType);
-
-        System.Diagnostics.Debug.WriteLine(
-            $"[PR ATTACHED] PR={prNumber} Type={prType}");
 
         var newMetadata =
             withPr.Metadata?.WithMetadata(metadata)
@@ -82,16 +79,10 @@ internal abstract class BasePlatformEnricher(ILogger logger) : ITimelineEnricher
             "Metadata attached | Metadata: {Metadata}",
             metadata);
 
-        System.Diagnostics.Debug.WriteLine(
-            $"[METADATA ATTACHED] {metadata}");
-
         Logger.LogDebug(
             "PR Enrichment finished | Target: {Target}",
             result.Target);
-
-        System.Diagnostics.Debug.WriteLine(
-            $"[PR ENRICH END] Target={result.Target}");
-
+        
         return result;
     }
 

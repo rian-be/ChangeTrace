@@ -1,4 +1,4 @@
-using ChangeTrace.Core.Interfaces;
+using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.Core.Timelines;
 
 namespace ChangeTrace.Cli.Services;
@@ -12,24 +12,14 @@ internal static class TimelineFileLoader
     /// Loads and deserializes a timeline from disk.
     /// </summary>
     public static async Task<Timeline> LoadAsync(
-        ISerializer<Timeline> serializer,
+        ITimelineRepository repository,
         string filePath,
         CancellationToken ct = default)
     {
-        if (serializer is IStreamingSerializer<Timeline> streamingSerializer)
-        {
-            await using var stream = new FileStream(
-                filePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 131072,
-                options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var result = await repository.LoadAsync(filePath, ct);
+        if (result.IsFailure)
+            throw new InvalidOperationException(result.Error ?? $"Failed to load timeline '{filePath}'.");
 
-            return await streamingSerializer.DeserializeAsync(stream, ct);
-        }
-
-        var data = await File.ReadAllBytesAsync(filePath, ct);
-        return await serializer.DeserializeAsync(data, ct);
+        return result.Value;
     }
 }

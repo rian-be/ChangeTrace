@@ -3,6 +3,7 @@ using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Enrichers;
+using ChangeTrace.GIt.Options;
 
 namespace ChangeTrace.GIt.Interfaces;
 
@@ -19,13 +20,15 @@ internal interface ITimelineEnricher
     /// </summary>
     /// <param name="timeline">Timeline to enrich. Must not be null.</param>
     /// <param name="repositoryId">Repository identifier used for platform queries.</param>
+    /// <param name="options">Export options for the current export.</param>
     /// <param name="cancellationToken">Optional cancellation token for async operations.</param>
     /// <returns>
     /// A <see cref="Result{EnrichmentResult}"/> indicating success or failure.
     /// Contains the number of matched events and unmatched items.
     /// </returns>
-    Task<Result<EnrichmentResult>> EnrichAsync(
+    Task<Result<EnrichmentResult>> Enrich(
         Timeline timeline,
         RepositoryId repositoryId,
+        ExportOptions options,
         CancellationToken cancellationToken = default);
 }

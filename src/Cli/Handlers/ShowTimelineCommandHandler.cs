@@ -2,8 +2,8 @@ using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Diagnostics;
-using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Timelines;
+using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.Graphics.Window;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
@@ -18,7 +18,7 @@ namespace ChangeTrace.Cli.Handlers;
 /// </summary>
 [AutoRegister(ServiceLifetime.Transient, typeof(ShowTimelineCommandHandler))]
 internal sealed class ShowTimelineCommandHandler(
-    ISerializer<Timeline> serializer,
+    ITimelineRepository repository,
     ITimelinePlayerFactory playerFactory,
     IRenderSystemFactory renderFactory,
     IDiagnosticsProvider diagnostics) : ICliHandler
@@ -38,7 +38,7 @@ internal sealed class ShowTimelineCommandHandler(
 
         AnsiConsole.MarkupLine($"[green]Playing[/] {Markup.Escape(filePath)}");
 
-        var timeline = await TimelineFileLoader.LoadAsync(serializer, filePath, ct);
+        var timeline = await TimelineFileLoader.LoadAsync(repository, filePath, ct);
         var player = playerFactory.Create(timeline, initialSpeed: 1.5, acceleration: 2.5);
 
         using var debugWindow = new DebugWindow(diagnostics);

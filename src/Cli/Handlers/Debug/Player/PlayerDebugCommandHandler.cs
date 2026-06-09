@@ -2,8 +2,8 @@ using System.CommandLine;
 using ChangeTrace.Cli.Commands.Debug;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
-using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Timelines;
+using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.Player.Factory;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,7 +14,7 @@ namespace ChangeTrace.Cli.Handlers.Debug.Player;
 /// </summary>
 [AutoRegister(ServiceLifetime.Transient, typeof(PlayerDebugCommandHandler))]
 internal sealed class PlayerDebugCommandHandler(
-    ISerializer<Timeline> serializer,
+    ITimelineRepository repository,
     ITimelinePlayerFactory playerFactory) : ICliHandler
 {
     /// <summary>
@@ -27,7 +27,7 @@ internal sealed class PlayerDebugCommandHandler(
         var filePath = parseResult.GetValue<string>("file")!;
 
         var timeline = await TimelineLoader.LoadAsync(
-            serializer,
+            repository,
             filePath,
             cancellationToken);
 

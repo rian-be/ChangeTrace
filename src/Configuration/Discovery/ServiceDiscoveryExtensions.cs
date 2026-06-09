@@ -86,6 +86,16 @@ internal static class ServiceDiscoveryExtensions
                             type.FullName);
                 }
             }
+
+            if (!type.IsGenericTypeDefinition)
+            {
+                services.Add(new ServiceDescriptor(type, type, attr.Lifetime));
+
+                if (enableLogging)
+                    logger.LogInformation(
+                        "DI Register SELF {Implementation}",
+                        type.FullName);
+            }
         }
         
         if (enableLogging)

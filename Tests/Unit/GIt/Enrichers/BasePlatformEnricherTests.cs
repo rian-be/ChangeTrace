@@ -4,6 +4,7 @@ using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Enrichers;
+using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -67,9 +68,10 @@ public sealed class BasePlatformEnricherTests
             => EnrichTraceEventWithPr(traceEvent, prNumber, prType, metadata);
 
         /// <summary>Completes the abstract contract without external platform calls.</summary>
-        public override Task<Result<EnrichmentResult>> EnrichAsync(
+        public override Task<Result<EnrichmentResult>> Enrich(
             Timeline timeline,
             RepositoryId repositoryId,
+            ExportOptions options,
             CancellationToken cancellationToken = default)
             => Task.FromResult(Result<EnrichmentResult>.Success(new EnrichmentResult(0, 0, 0)));
     }
