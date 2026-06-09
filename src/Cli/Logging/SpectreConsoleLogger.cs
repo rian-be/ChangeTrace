@@ -45,6 +45,8 @@ internal sealed class SpectreConsoleLogger(string categoryName, LogLevel minLeve
             return;
 
         var message = formatter(state, exception);
+        if (exception is not null && logLevel < LogLevel.Error)
+            message = $"{message} ({exception.GetType().Name}: {exception.Message})";
         var shortCategory = categoryName.Split('.').LastOrDefault() ?? categoryName;
 
         var (color, level) = logLevel switch
@@ -61,7 +63,7 @@ internal sealed class SpectreConsoleLogger(string categoryName, LogLevel minLeve
         var markup = $"[grey]{DateTime.Now:HH:mm:ss}[/] [{color}]{level,-5}[/] [grey]{shortCategory}:[/] {Markup.Escape(message)}";
         AnsiConsole.MarkupLine(markup);
 
-        if (exception != null)
+        if (exception != null && logLevel >= LogLevel.Error)
         {
             AnsiConsole.WriteException(exception, ExceptionFormats.ShortenPaths);
         }
