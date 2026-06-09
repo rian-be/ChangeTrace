@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Timelines;
 using Microsoft.Extensions.Logging;
@@ -13,14 +14,22 @@ internal sealed partial class TimelineRepositoryMsgPack
     /// <summary>
     /// Enables debug snapshot writes for small timelines.
     /// </summary>
-    private bool ShouldWriteDebugSnapshot(Timeline timeline)
-        => (logger.IsEnabled(LogLevel.Debug) || logger.GetType().Name.StartsWith("NullLogger"))
-           && timeline.Events.Count <= 50000;
+    private string? GetDebugSnapshotSkipReason(Timeline timeline)
+    {
+        if (timeline.Events.Count > 50000)
+            return $"timeline has {timeline.Events.Count} events";
+
+        if (logger.IsEnabled(LogLevel.Debug) || logger.GetType().Name.StartsWith("NullLogger"))
+            return null;
+
+        return "logger is not configured for Debug level";
+    }
 
     /// <summary>
     /// Writes a JSON debug snapshot alongside the saved timeline.
     /// </summary>
     private static async Task WriteDebugSnapshotAsync(
+        AtomicFileTransaction transaction,
         Timeline timeline,
         string filePath,
         CancellationToken cancellationToken)
@@ -30,10 +39,12 @@ internal sealed partial class TimelineRepositoryMsgPack
             snapshot,
             new JsonSerializerOptions
             {
-                WriteIndented = true
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             });
 
-        await File.WriteAllTextAsync(filePath + ".debug.json", json, cancellationToken);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        await transaction.WriteBytesAsync(GetDebugSnapshotPath(filePath), bytes, cancellationToken);
     }
 
     /// <summary>
@@ -83,6 +94,8 @@ internal sealed partial class TimelineRepositoryMsgPack
         object? branchType,
         string? commitSha,
         object? commitType,
+        int? pullRequestNumber,
+        object? pullRequestType,
         string? filePath,
         string? metadataMessage,
         string target)
@@ -93,6 +106,8 @@ internal sealed partial class TimelineRepositoryMsgPack
         public object? BranchType { get; } = branchType;
         public string? CommitSha { get; } = commitSha;
         public object? CommitType { get; } = commitType;
+        public int? PullRequestNumber { get; } = pullRequestNumber;
+        public object? PullRequestType { get; } = pullRequestType;
         public string? FilePath { get; } = filePath;
         public string? MetadataMessage { get; } = metadataMessage;
         public string Target { get; } = target;
@@ -104,6 +119,7 @@ internal sealed partial class TimelineRepositoryMsgPack
         {
             var branch = evt.Branch;
             var commit = evt.Commit;
+            var pullRequest = evt.PullRequest;
             var metadata = evt.Metadata;
 
             return new DebugTimelineEventSnapshot(
@@ -113,9 +129,17 @@ internal sealed partial class TimelineRepositoryMsgPack
                 branch?.Type,
                 commit?.Sha.Value,
                 commit?.Type,
+                pullRequest?.Number.Value,
+                pullRequest?.Type,
                 metadata?.FilePath?.Value,
                 metadata?.Metadata,
                 evt.Target);
         }
     }
+
+    /// <summary>
+    /// Gets the debug snapshot path for the main timeline file.
+    /// </summary>
+    private static string GetDebugSnapshotPath(string filePath)
+        => filePath + ".debug.json";
 }

@@ -8,6 +8,7 @@ using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
+using ChangeTrace.GIt.Services.Sidecars;
 using Microsoft.Extensions.Logging;
 
 namespace ChangeTrace.Benchmarks.GIt.Benchmarks;
@@ -63,10 +64,13 @@ public class RepositoryExporterEndToEndBenchmarks
 
         var serializer = new MessagePackSerializer<Timeline>(
             [new TimelineMessagePackFormatter()]);
+        var fileManager = new FileManager();
         var repository = new TimelineRepositoryMsgPack(
             _loggerFactory.CreateLogger<TimelineRepositoryMsgPack>(),
             serializer,
-            new FileManager());
+            fileManager,
+            new PullRequestSidecarHandler(_loggerFactory.CreateLogger<PullRequestSidecarHandler>(), fileManager),
+            new MergeSidecarHandler(_loggerFactory.CreateLogger<MergeSidecarHandler>(), fileManager));
 
         _exporter = new RepositoryExporter(
             new GeneratedGitRepositoryReader(),

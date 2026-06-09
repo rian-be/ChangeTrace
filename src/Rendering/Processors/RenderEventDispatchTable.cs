@@ -15,6 +15,7 @@ internal static class RenderEventDispatchTable
         (RenderEventKinds.Commit, DispatchCommit),
         (RenderEventKinds.Branch, DispatchBranch),
         (RenderEventKinds.Merge, DispatchMerge),
+        (RenderEventKinds.PullRequest, DispatchPullRequest),
         (RenderEventKinds.FileCoupling, DispatchFileCoupling)
     };
 
@@ -35,6 +36,12 @@ internal static class RenderEventDispatchTable
         TraceEventAggregationStage aggregation) =>
         pipeline.DispatchAggregated(
             aggregation.GetWriter<MergeEvent>());
+
+    private static void DispatchPullRequest(
+        RenderingPipeline pipeline,
+        TraceEventAggregationStage aggregation) =>
+        pipeline.DispatchAggregated(
+            aggregation.GetWriter<PullRequestEvent>());
 
     private static void DispatchFileCoupling(
         RenderingPipeline pipeline,

@@ -3,6 +3,7 @@ using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Enrichers;
 using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
 using Xunit;
 
@@ -40,9 +41,10 @@ public sealed class TimelineEnricherResolverTests
     {
         public string Provider => provider;
 
-        public Task<Result<EnrichmentResult>> EnrichAsync(
+        public Task<Result<EnrichmentResult>> Enrich(
             Timeline timeline,
             RepositoryId repositoryId,
+            ExportOptions options,
             CancellationToken cancellationToken = default)
             => Task.FromResult(Result<EnrichmentResult>.Success(new EnrichmentResult(0, 0, 0)));
     }

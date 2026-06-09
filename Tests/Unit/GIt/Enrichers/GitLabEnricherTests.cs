@@ -3,8 +3,8 @@ using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Enrichers;
 using ChangeTrace.GIt.Models;
+using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace ChangeTrace.Tests.GIt.Enrichers;
@@ -37,7 +37,7 @@ public sealed class GitLabEnricherTests
             sha,
             "metadata"));
 
-        var result = await enricher.EnrichAsync(timeline, repositoryId);
+        var result = await enricher.Enrich(timeline, repositoryId, new ExportOptions());
 
         Assert.True(result.IsSuccess, result.Error);
         Assert.Equal(1, result.Value.MatchedCount);
@@ -48,9 +48,10 @@ public sealed class GitLabEnricherTests
     }
 
     private sealed class TestGitLabEnricher(IReadOnlyList<GitLabMergeRequestSnapshot> mergeRequests)
-        : GitLabEnricher(Options.Create(new ChangeTrace.GIt.Options.ExportOptions()), NullLogger<GitLabEnricher>.Instance)
+        : GitLabEnricher(NullLogger<GitLabEnricher>.Instance)
     {
         protected override IEnumerable<GitLabMergeRequestSnapshot> GetMergeRequests(
+            NGitLab.GitLabClient client,
             RepositoryId repositoryId,
             CancellationToken cancellationToken = default)
             => mergeRequests;

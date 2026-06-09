@@ -3,6 +3,7 @@ using System.Diagnostics;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace.Interfaces;
+using ChangeTrace.Cli.Prompts;
 using ChangeTrace.GIt.Delegates;
 using ChangeTrace.GIt.Helpers;
 using ChangeTrace.GIt.Interfaces;
@@ -37,6 +38,8 @@ internal sealed class ExportCommandHandler(
         var repo = repoResult.Value!;
         var explicitOutput = parseResult.GetValue<string?>("--output");
         var token = parseResult.GetValue<string?>("--token");
+        var enrichChoice = parseResult.GetValue<string?>("--enrich");
+        var mergeDetectionChoice = parseResult.GetValue<bool?>("--merge-detection");
         var verbose = parseResult.GetValue<bool>("--verbose");
         var useGitCli = parseResult.GetValue<bool>("--git-cli");
         var noRenames = parseResult.GetValue<bool>("--no-renames");
@@ -73,12 +76,23 @@ internal sealed class ExportCommandHandler(
             }
         }
 
+        var enrichmentKinds = ResolveEnrichmentKinds(enrichChoice);
+        if (enrichmentKinds is null)
+        {
+            AnsiConsole.MarkupLine("[red]Invalid enrichment value.[/] Use [yellow]none[/] or [yellow]pull-requests[/].");
+            return;
+        }
+
+        var includeMergeDetection = ResolveMergeDetection(mergeDetectionChoice);
+        if (includeMergeDetection is null)
+            return;
+
         var options = new ExportOptions
         {
             GitHubToken = provider == "github" ? token : null,
             GitLabToken = provider == "gitlab" ? token : null,
-            IncludeMergeDetection = true,
-            EnrichWithPullRequests = true,
+            IncludeMergeDetection = includeMergeDetection.Value,
+            EnrichmentKinds = enrichmentKinds.Value,
             IncludeBranchEvents = true,
             HistoryBackend = useGitCli
                 ? GitHistoryReaderBackend.GitCli
@@ -119,11 +133,84 @@ internal sealed class ExportCommandHandler(
         }
     }
 
+    private static ExportEnrichmentKind? ResolveEnrichmentKinds(string? enrichChoice)
+    {
+        if (!string.IsNullOrWhiteSpace(enrichChoice))
+        {
+            return enrichChoice.Trim().ToLowerInvariant() switch
+            {
+                "none" => ExportEnrichmentKind.None,
+                "pull-requests" or "pr" or "prs" => ExportEnrichmentKind.PullRequests,
+                _ => null
+            };
+        }
+
+        if (!AnsiConsole.Profile.Capabilities.Interactive)
+            return ExportEnrichmentKind.PullRequests;
+
+        return EnrichmentPrompt.SelectEnrichmentKinds();
+    }
+
+    private static bool? ResolveMergeDetection(bool? mergeDetectionChoice)
+    {
+        if (mergeDetectionChoice.HasValue)
+            return mergeDetectionChoice.Value;
+
+        if (!AnsiConsole.Profile.Capabilities.Interactive)
+            return true;
+
+        return MergeDetectionPrompt.SelectMergeDetection();
+    }
+
     private static string? TryDetectProvider(string repository)
     {
         try
         {
-            return ProviderUrlHelper.DetectProvider(repository);
+            if (IsRemoteRepository(repository))
+                return ProviderUrlHelper.DetectProvider(repository);
+
+            var remoteOrigin = GetRemoteOriginUrl(repository);
+            return remoteOrigin is null
+                ? null
+                : ProviderUrlHelper.DetectProvider(remoteOrigin);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? GetRemoteOriginUrl(string repoPath)
+    {
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.StartInfo.ArgumentList.Add("-C");
+            process.StartInfo.ArgumentList.Add(repoPath);
+            process.StartInfo.ArgumentList.Add("remote");
+            process.StartInfo.ArgumentList.Add("get-url");
+            process.StartInfo.ArgumentList.Add("origin");
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+                return null;
+
+            var remoteUrl = output.Trim();
+            return string.IsNullOrWhiteSpace(remoteUrl) ? null : remoteUrl;
         }
         catch
         {

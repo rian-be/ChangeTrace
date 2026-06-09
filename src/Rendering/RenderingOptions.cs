@@ -35,6 +35,11 @@ internal sealed class RenderingOptions
     public bool RenderMerges => EnabledEvents.HasFlag(RenderEventKinds.Merge);
 
     /// <summary>
+    /// Gets a value indicating whether pull request events should be rendered.
+    /// </summary>
+    public bool RenderPullRequests => EnabledEvents.HasFlag(RenderEventKinds.PullRequest);
+
+    /// <summary>
     /// Gets a value indicating whether file coupling events should be rendered.
     /// </summary>
     public bool RenderFileCoupling => EnabledEvents.HasFlag(RenderEventKinds.FileCoupling);

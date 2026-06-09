@@ -2,7 +2,8 @@ using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Timelines;
-using ChangeTrace.GIt.Dto;
+using ChangeTrace.GIt.Dto.Common;
+using ChangeTrace.GIt.Dto.Timelines;
 using Xunit;
 
 namespace ChangeTrace.Tests.GIt.Dto;

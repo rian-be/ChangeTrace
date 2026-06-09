@@ -8,7 +8,6 @@ using ChangeTrace.GIt.Models;
 using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NGitLab;
 using NGitLab.Models;
 
@@ -18,11 +17,8 @@ namespace ChangeTrace.GIt.Enrichers;
 /// GitLab specific timeline enricher.
 /// </summary>
 [AutoRegister(ServiceLifetime.Singleton, typeof(IProviderTimelineEnricher))]
-internal class GitLabEnricher(
-    IOptions<ExportOptions> options,
-    ILogger<GitLabEnricher> logger) : BasePlatformEnricher(logger), IProviderTimelineEnricher
+internal class GitLabEnricher(ILogger<GitLabEnricher> logger) : BasePlatformEnricher(logger), IProviderTimelineEnricher
 {
-    private readonly GitLabClient _client = CreateClient(options.Value);
 
     /// <summary>
     /// Provider handled by this enricher.
@@ -32,20 +28,22 @@ internal class GitLabEnricher(
     /// <summary>
     /// Enriches the timeline with GitLab merge request data.
     /// </summary>
-    public override Task<Result<EnrichmentResult>> EnrichAsync(
+    public override Task<Result<EnrichmentResult>> Enrich(
         Timeline timeline,
         RepositoryId repositoryId,
+        ExportOptions options,
         CancellationToken cancellationToken = default)
     {
         try
         {
             Logger.LogInformation("Fetching merge requests from {Repo}", repositoryId.FullName);
 
+            var client = CreateClient(options);
             var lookup = BuildLookup(timeline);
             var processed = 0;
             var matched = 0;
 
-            foreach (var mergeRequest in GetMergeRequests(repositoryId, cancellationToken))
+            foreach (var mergeRequest in GetMergeRequests(client, repositoryId, cancellationToken))
             {
                 processed++;
 
@@ -82,11 +80,12 @@ internal class GitLabEnricher(
     /// Returns merge requests for a repository.
     /// </summary>
     protected virtual IEnumerable<GitLabMergeRequestSnapshot> GetMergeRequests(
+        GitLabClient client,
         RepositoryId repositoryId,
         CancellationToken cancellationToken = default)
     {
         var projectId = new ProjectId(repositoryId.FullName);
-        var mrClient = _client.GetMergeRequest(projectId);
+        var mrClient = client.GetMergeRequest(projectId);
 
         foreach (var mergeRequest in mrClient.All)
         {

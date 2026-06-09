@@ -3,7 +3,7 @@ using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Services;
 using ChangeTrace.Core.Timelines;
-using ChangeTrace.GIt.Dto;
+using ChangeTrace.GIt.Dto.Timelines;
 using ChangeTrace.GIt.Services;
 using MessagePack;
 using MessagePack.Resolvers;

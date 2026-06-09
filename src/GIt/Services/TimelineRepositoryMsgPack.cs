@@ -1,5 +1,6 @@
 using System.Buffers;
 using ChangeTrace.Configuration.Discovery;
+using ChangeTrace.Core.Enums;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Models;
@@ -8,6 +9,7 @@ using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Services;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.GIt.Services.Sidecars;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MessagePack;
@@ -22,7 +24,9 @@ namespace ChangeTrace.GIt.Services;
 internal sealed partial class TimelineRepositoryMsgPack(
     ILogger<TimelineRepositoryMsgPack> logger,
     ISerializer<Timeline> serializer,
-    IFileManager fileManager)
+    IFileManager fileManager,
+    PullRequestSidecarHandler pullRequestSidecarHandler,
+    MergeSidecarHandler mergeSidecarHandler)
     : ITimelineRepository, IStreamingTimelineRepository
 {
     private const string FileExtension = ".gittrace";
@@ -36,12 +40,33 @@ internal sealed partial class TimelineRepositoryMsgPack(
         {
             filePath = fileManager.EnsureExtension(filePath, FileExtension);
             logger.LogInformation("Saving timeline to {Path}", filePath);
-            var byteLength = await WriteTimelineAsync(filePath, timeline, cancellationToken);
+            var timelineToSave = StripSidecarEvents(timeline);
+            var debugSnapshotSkipReason = GetDebugSnapshotSkipReason(timelineToSave);
+            var shouldWriteDebugSnapshot = debugSnapshotSkipReason is null;
+
+            await using var transaction = new AtomicFileTransaction(fileManager);
+
+            var byteLength = await WriteTimelineAsync(transaction, filePath, timelineToSave, cancellationToken);
+
+            await mergeSidecarHandler.PersistAsync(transaction, timeline, filePath, shouldWriteDebugSnapshot, cancellationToken);
+            await pullRequestSidecarHandler.PersistAsync(transaction, timeline, filePath, shouldWriteDebugSnapshot, cancellationToken);
+
+            await PersistMainDebugSnapshotAsync(
+                transaction,
+                timelineToSave,
+                filePath,
+                shouldWriteDebugSnapshot,
+                cancellationToken);
+
+            if (debugSnapshotSkipReason is not null)
+                logger.LogDebug("Skipping debug snapshot: {Reason}", debugSnapshotSkipReason);
+
+            await transaction.CommitAsync();
+
+            mergeSidecarHandler.Cleanup(filePath);
+            pullRequestSidecarHandler.Cleanup(filePath);
 
             logger.LogInformation("Timeline saved successfully ({Length} bytes)", byteLength);
-
-            if (ShouldWriteDebugSnapshot(timeline))
-                await WriteDebugSnapshotAsync(timeline, filePath, cancellationToken);
 
             return Result.Success();
         }
@@ -80,13 +105,18 @@ internal sealed partial class TimelineRepositoryMsgPack(
                 options,
                 cancellationToken);
 
-            await using var outputStream = await fileManager.OpenWriteAsync(filePath, cancellationToken);
-            await WriteTimelinePayloadAsync(
-                outputStream,
-                tempEventsPath,
-                eventCount,
-                options.RepositoryId,
-                cancellationToken);
+            await using var transaction = new AtomicFileTransaction(fileManager);
+            await using (var outputStream = await transaction.OpenWriteAsync(filePath, cancellationToken))
+            {
+                await WriteTimelinePayloadAsync(
+                    outputStream,
+                    tempEventsPath,
+                    eventCount,
+                    options.RepositoryId,
+                    cancellationToken);
+            }
+
+            await transaction.CommitAsync();
 
             logger.LogInformation("Timeline streamed successfully ({Count} events)", eventCount);
             return Result.Success();
@@ -125,6 +155,9 @@ internal sealed partial class TimelineRepositoryMsgPack(
                 timeline = await serializer.DeserializeAsync(bytes, cancellationToken);
             }
 
+            await mergeSidecarHandler.ApplyAsync(filePath, timeline, cancellationToken);
+            await pullRequestSidecarHandler.ApplyAsync(filePath, timeline, cancellationToken);
+
             logger.LogInformation("Timeline loaded: {Count} events", timeline.Count);
             return Result<Timeline>.Success(timeline);
         }
@@ -136,23 +169,25 @@ internal sealed partial class TimelineRepositoryMsgPack(
     }
 
     private async Task<long> WriteTimelineAsync(
+        AtomicFileTransaction transaction,
         string filePath,
         Timeline timeline,
         CancellationToken cancellationToken)
     {
         if (serializer is IStreamingSerializer<Timeline> streamingSerializer)
-            return await WriteTimelineStreamAsync(filePath, timeline, streamingSerializer, cancellationToken);
+            return await WriteTimelineStreamAsync(transaction, filePath, timeline, streamingSerializer, cancellationToken);
 
-        return await WriteTimelineBufferAsync(filePath, timeline, cancellationToken);
+        return await WriteTimelineBufferAsync(transaction, filePath, timeline, cancellationToken);
     }
 
     private async Task<long> WriteTimelineStreamAsync(
+        AtomicFileTransaction transaction,
         string filePath,
         Timeline timeline,
         IStreamingSerializer<Timeline> streamingSerializer,
         CancellationToken cancellationToken)
     {
-        await using var stream = await fileManager.OpenWriteAsync(filePath, cancellationToken);
+        await using var stream = await transaction.OpenWriteAsync(filePath, cancellationToken);
         await streamingSerializer.SerializeAsync(stream, timeline, cancellationToken);
         await stream.FlushAsync(cancellationToken);
 
@@ -160,13 +195,64 @@ internal sealed partial class TimelineRepositoryMsgPack(
     }
 
     private async Task<long> WriteTimelineBufferAsync(
+        AtomicFileTransaction transaction,
         string filePath,
         Timeline timeline,
         CancellationToken cancellationToken)
     {
         var bytes = await serializer.SerializeAsync(timeline, cancellationToken);
-        await fileManager.SaveAsync(filePath, bytes, cancellationToken);
+        await transaction.WriteBytesAsync(filePath, bytes, cancellationToken);
         return bytes.Length;
+    }
+
+    private async Task PersistMainDebugSnapshotAsync(
+        AtomicFileTransaction transaction,
+        Timeline timeline,
+        string filePath,
+        bool shouldWriteDebugSnapshot,
+        CancellationToken cancellationToken)
+    {
+        if (shouldWriteDebugSnapshot)
+            await WriteDebugSnapshotAsync(transaction, timeline, filePath, cancellationToken);
+        else
+            transaction.Delete(GetDebugSnapshotPath(filePath));
+    }
+
+    private static Timeline StripSidecarEvents(Timeline timeline)
+    {
+        var events = timeline.EventsSpan;
+        var needsStrip = false;
+
+        for (var index = 0; index < events.Length; index++)
+        {
+            var evt = events[index];
+            if (evt.Branch?.Type == BranchEventType.Merge || evt.PullRequest is not null)
+            {
+                needsStrip = true;
+                break;
+            }
+        }
+
+        if (!needsStrip)
+            return timeline;
+
+        var stripped = new Timeline(timeline.RepositoryId, events.Length);
+
+        for (var index = 0; index < events.Length; index++)
+        {
+            var evt = events[index];
+            var strippedEvent = evt;
+
+            if (evt.Branch?.Type == BranchEventType.Merge)
+                strippedEvent = strippedEvent.WithoutBranch();
+
+            if (evt.PullRequest is not null)
+                strippedEvent = strippedEvent.WithoutPullRequest();
+
+            stripped.AddEvent(strippedEvent);
+        }
+
+        return stripped;
     }
 
     private async Task<int> WriteEventPayloadAsync(

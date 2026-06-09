@@ -3,6 +3,7 @@ using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.GIt.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,9 +23,10 @@ internal sealed class CodebergEnricher(ILogger<CodebergEnricher> logger) : IProv
     /// <summary>
     /// Returns a clear not-implemented result for Codeberg enrichment.
     /// </summary>
-    public Task<Result<EnrichmentResult>> EnrichAsync(
+    public Task<Result<EnrichmentResult>> Enrich(
         Timeline timeline,
         RepositoryId repositoryId,
+        ExportOptions options,
         CancellationToken cancellationToken = default)
     {
         logger.LogWarning("Codeberg enrichment is not implemented yet for {Repo}", repositoryId.FullName);

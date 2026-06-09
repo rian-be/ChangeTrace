@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core;
 using ChangeTrace.Core.Models;
@@ -8,6 +11,7 @@ using ChangeTrace.GIt.Delegates;
 using ChangeTrace.GIt.Helpers;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
+using ChangeTrace.GIt.Services.Checkpoints.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +28,8 @@ internal sealed class RepositoryExporter(
     ITimelineBuilder timelineBuilder,
     ITimelineRepository repository,
     ILogger<RepositoryExporter> logger,
-    ITimelineEnricherResolver enricherResolver) : IRepositoryExporter
+    ITimelineEnricherResolver enricherResolver,
+    IExportCheckpointStore checkpointStore) : IRepositoryExporter
 {
     /// <summary>
     /// Exports repository to timeline.
@@ -53,10 +58,11 @@ internal sealed class RepositoryExporter(
             if (pathResult.IsFailure)
                 return Result<Timeline>.Failure(pathResult.Error!);
 
-            var repoPath = pathResult.Value;
+            await using var checkout = pathResult.Value!;
+            var repoPath = checkout.Path;
             progress?.Invoke("Prepare", 1, 4, "Repository ready");
 
-            var repositoryId = ExtractRepositoryId(pathOrUrl);
+            var repositoryId = ResolveRepositoryId(pathOrUrl, repoPath);
             // Step 2 and 3: Stream commits and build timeline.
             var timelineResult = await BuildTimelineFromRepositoryStep(
                 repoPath,
@@ -71,7 +77,7 @@ internal sealed class RepositoryExporter(
             progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
 
             // Step 4 and 5 Enrich with PR data & Normalize
-        var enrichResult = await EnrichStep(timeline, pathOrUrl, options, progress, cancellationToken);
+            var enrichResult = await EnrichStep(timeline, pathOrUrl, repoPath, options, progress, cancellationToken);
             if (enrichResult.IsFailure)
                 return Result<Timeline>.Failure(enrichResult.Error!);
 
@@ -107,7 +113,8 @@ internal sealed class RepositoryExporter(
         ProgressCallback? progress = null,
         CancellationToken cancellationToken = default)
     {
-        if (repository is IStreamingTimelineRepository streamingRepository && !options.EnrichWithPullRequests)
+        if (repository is IStreamingTimelineRepository streamingRepository &&
+            !options.EnrichmentKinds.HasFlag(ExportEnrichmentKind.PullRequests))
         {
             try
             {
@@ -118,10 +125,11 @@ internal sealed class RepositoryExporter(
                 if (pathResult.IsFailure)
                     return Result.Failure(pathResult.Error!);
 
-                var repoPath = pathResult.Value;
+                await using var checkout = pathResult.Value;
+                var repoPath = checkout.Path;
                 progress?.Invoke("Prepare", 1, 4, "Repository ready");
 
-                var repositoryId = ExtractRepositoryId(pathOrUrl);
+                var repositoryId = ResolveRepositoryId(pathOrUrl, repoPath);
                 progress?.Invoke("Read", 1, 4, "Reading commits...");
 
                 var backend = SelectHistoryBackend(repoPath, options);
@@ -167,22 +175,103 @@ internal sealed class RepositoryExporter(
             }
         }
 
-        var exportResult = await ExportAsync(pathOrUrl, options, progress, cancellationToken);
+        var checkpointOptions = options with
+        {
+            CheckpointKey = outputPath,
+            CheckpointFingerprint = CreateCheckpointFingerprint(pathOrUrl, options)
+        };
 
-        if (exportResult.IsFailure)
-            return Result.Failure(exportResult.Error!);
+        try
+        {
+            logger.LogInformation("Starting resumable export+save: {Path}", pathOrUrl);
 
-        var saveResult = await repository.SaveAsync(
-            exportResult.Value,
-            outputPath,
-            cancellationToken
-        );
+            progress?.Invoke("Prepare", 0, 4, "Preparing repository...");
 
-        if (saveResult.IsFailure)
-            return Result.Failure(saveResult.Error!);
+            Timeline? timeline;
+            var checkpoint = await LoadCheckpointAsync(checkpointOptions, cancellationToken);
 
-        logger.LogInformation("Timeline saved to: {Path}", outputPath);
-        return Result.Success();
+            if (checkpoint is not null)
+            {
+                logger.LogInformation(
+                    "Resuming export from checkpoint: {Stage}",
+                    checkpoint.Stage);
+
+                timeline = checkpoint.Timeline;
+            }
+            else
+            {
+                var pathResult = await GetRepositoryPathStep(pathOrUrl, cancellationToken);
+                if (pathResult.IsFailure)
+                    return Result.Failure(pathResult.Error!);
+
+                await using var checkout = pathResult.Value;
+                var repoPath = checkout.Path;
+                progress?.Invoke("Prepare", 1, 4, "Repository ready");
+
+                var repositoryId = ResolveRepositoryId(pathOrUrl, repoPath);
+                var timelineResult = await BuildTimelineFromRepositoryStep(
+                    repoPath,
+                    repositoryId,
+                    checkpointOptions,
+                    progress,
+                    cancellationToken);
+                if (timelineResult.IsFailure)
+                    return Result.Failure(timelineResult.Error!);
+
+                timeline = timelineResult.Value;
+                progress?.Invoke("Build", 3, 4, $"Built {timeline.Count} events");
+
+                await SaveCheckpointAsync(
+                    checkpointOptions,
+                    timeline,
+                    ExportCheckpointStage.Built,
+                    1,
+                    0,
+                    cancellationToken);
+            }
+
+            if (ShouldRunEnrichment(checkpoint))
+            {
+                var enrichResult = await EnrichStep(
+                    timeline,
+                    pathOrUrl,
+                    pathOrUrl,
+                    checkpointOptions,
+                    progress,
+                    cancellationToken);
+
+                if (enrichResult.IsFailure)
+                    return Result.Failure(enrichResult.Error!);
+
+                await SaveCheckpointAsync(
+                    checkpointOptions,
+                    timeline,
+                    ExportCheckpointStage.SavingTimeline,
+                    0,
+                    0,
+                    cancellationToken);
+            }
+
+            TimelineNormalizer.Normalize(timeline);
+
+            var saveResult = await repository.SaveAsync(
+                timeline,
+                outputPath,
+                cancellationToken);
+
+            if (saveResult.IsFailure)
+                return Result.Failure(saveResult.Error!);
+
+            await ClearCheckpointAsync(checkpointOptions, cancellationToken);
+
+            logger.LogInformation("Timeline saved to: {Path}", outputPath);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Resumable export+save failed");
+            return Result.Failure("Export failed", ex);
+        }
     }
 
     /// <summary>
@@ -194,7 +283,7 @@ internal sealed class RepositoryExporter(
     /// A <see cref="Result{String}"/> containing the local repository path.
     /// For URLs, returns path to temporary clone; for local paths, returns the path if it exists.
     /// </returns>
-    private async Task<Result<string>> GetRepositoryPathStep(
+    private async Task<Result<RepositoryCheckout>> GetRepositoryPathStep(
         string pathOrUrl,
         CancellationToken cancellationToken)
     {
@@ -207,13 +296,13 @@ internal sealed class RepositoryExporter(
 
             var cloneResult = await gitReader.CloneAsync(pathOrUrl, tempPath, cancellationToken);
             return cloneResult.IsFailure
-                ? Result<string>.Failure(cloneResult.Error!)
-                : Result<string>.Success(tempPath);
+                ? Result<RepositoryCheckout>.Failure(cloneResult.Error!)
+                : Result<RepositoryCheckout>.Success(new RepositoryCheckout(tempPath, tempPath));
         }
 
         return !Directory.Exists(pathOrUrl)
-            ? Result<string>.Failure($"Directory not found: {pathOrUrl}")
-            : Result<string>.Success(pathOrUrl);
+            ? Result<RepositoryCheckout>.Failure($"Directory not found: {pathOrUrl}")
+            : Result<RepositoryCheckout>.Success(new RepositoryCheckout(pathOrUrl, null));
     }
 
     private async Task<Result<Timeline>> BuildTimelineFromRepositoryStep(
@@ -297,14 +386,15 @@ internal sealed class RepositoryExporter(
     private async Task<Result> EnrichStep(
         Timeline timeline,
         string pathOrUrl,
+        string repoPath,
         ExportOptions options,
         ProgressCallback? progress,
         CancellationToken ct)
     {
-        if (!options.EnrichWithPullRequests)
+        if (!options.EnrichmentKinds.HasFlag(ExportEnrichmentKind.PullRequests))
             return Result.Success();
 
-        var providerResult = TryDetectProvider(pathOrUrl, options);
+        var providerResult = TryDetectProvider(pathOrUrl, repoPath, options);
         if (providerResult.IsFailure)
             return Result.Failure(providerResult.Error!);
 
@@ -321,12 +411,12 @@ internal sealed class RepositoryExporter(
             return Result.Success();
         }
 
-        var repositoryId = ExtractRepositoryId(pathOrUrl);
+        var repositoryId = ResolveRepositoryId(pathOrUrl, repoPath);
         if (repositoryId == null)
             return Result.Failure($"Unable to derive repository identifier for provider '{provider}'.");
 
         progress?.Invoke("Enrich", 3, 4, "Enriching with PR data...");
-        var enrichResult = await enricher.EnrichAsync(timeline, repositoryId, ct);
+        var enrichResult = await enricher.Enrich(timeline, repositoryId, options, ct);
 
         if (enrichResult.IsSuccess)
             logger.LogInformation("Enriched {Count} events", enrichResult.Value.MatchedCount);
@@ -338,18 +428,21 @@ internal sealed class RepositoryExporter(
             : Result.Failure(enrichResult.Error!);
     }
 
-    private static Result<string?> TryDetectProvider(string pathOrUrl, ExportOptions options)
+    private static Result<string?> TryDetectProvider(string pathOrUrl, string repoPath, ExportOptions options)
     {
-        if (!IsGitUrl(pathOrUrl))
+        var remoteUrl = GetRemoteOriginUrl(repoPath);
+        var providerSource = remoteUrl ?? pathOrUrl;
+
+        if (!IsGitUrl(providerSource))
             return Result<string?>.Success(null);
 
         try
         {
-            return Result<string?>.Success(ProviderUrlHelper.DetectProvider(pathOrUrl));
+            return Result<string?>.Success(ProviderUrlHelper.DetectProvider(providerSource));
         }
         catch (NotSupportedException ex)
         {
-            if (IsGitLabRepository(pathOrUrl, options.GitLabBaseUrl))
+            if (IsGitLabRepository(providerSource, options.GitLabBaseUrl))
                 return Result<string?>.Success("gitlab");
 
             return Result<string?>.Failure(ex.Message);
@@ -392,6 +485,38 @@ internal sealed class RepositoryExporter(
     private static bool IsGitUrl(string pathOrUrl) =>
          pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
                pathOrUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Repository path scope with optional temporary checkout cleanup.
+    /// </summary>
+    private sealed class RepositoryCheckout(string path, string? temporaryPath) : IAsyncDisposable
+    {
+        /// <summary>
+        /// Gets the resolved repository path.
+        /// </summary>
+        public string Path { get; } = path;
+
+        /// <summary>
+        /// Disposes the temporary checkout if one was created.
+        /// </summary>
+        public ValueTask DisposeAsync()
+        {
+            if (string.IsNullOrWhiteSpace(temporaryPath))
+                return ValueTask.CompletedTask;
+
+            try
+            {
+                if (Directory.Exists(temporaryPath))
+                    Directory.Delete(temporaryPath, true);
+            }
+            catch
+            {
+                // Best effort cleanup.
+            }
+
+            return ValueTask.CompletedTask;
+        }
+    }
 
     /// <summary>
     /// Extracts repository owner and name from Git URL.
@@ -441,12 +566,158 @@ internal sealed class RepositoryExporter(
         return null;
     }
 
+    private static RepositoryId? ResolveRepositoryId(
+        string pathOrUrl,
+        string repoPath)
+    {
+        var direct = ExtractRepositoryId(pathOrUrl);
+        if (direct is not null)
+            return direct;
+
+        var remoteUrl = GetRemoteOriginUrl(repoPath);
+        return remoteUrl is null
+            ? null
+            : ExtractRepositoryId(remoteUrl);
+    }
+
+    private async Task<ExportCheckpointState?> LoadCheckpointAsync(
+        ExportOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.CheckpointKey) ||
+            string.IsNullOrWhiteSpace(options.CheckpointFingerprint))
+        {
+            return null;
+        }
+
+        return await checkpointStore.TryLoad(
+            options.CheckpointKey,
+            options.CheckpointFingerprint,
+            cancellationToken);
+    }
+
+    private async Task SaveCheckpointAsync(
+        ExportOptions options,
+        Timeline timeline,
+        ExportCheckpointStage stage,
+        int nextPullRequestPage,
+        int nextPullRequestIndex,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.CheckpointKey) ||
+            string.IsNullOrWhiteSpace(options.CheckpointFingerprint))
+        {
+            return;
+        }
+
+        try
+        {
+            await checkpointStore.Save(
+                options.CheckpointKey,
+                new ExportCheckpointState(
+                    options.CheckpointFingerprint,
+                    stage,
+                    nextPullRequestPage,
+                    nextPullRequestIndex,
+                    timeline),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to persist export checkpoint for {Stage}; continuing without resume data.", stage);
+        }
+    }
+
+    private async Task ClearCheckpointAsync(
+        ExportOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.CheckpointKey) ||
+            string.IsNullOrWhiteSpace(options.CheckpointFingerprint))
+        {
+            return;
+        }
+
+        try
+        {
+            await checkpointStore.Clear(options.CheckpointKey, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to clear export checkpoint; leaving stale resume data in place.");
+        }
+    }
+
+    private static bool ShouldRunEnrichment(ExportCheckpointState? checkpoint)
+        => checkpoint is null
+           || checkpoint.Stage is ExportCheckpointStage.Built
+           || checkpoint.Stage is ExportCheckpointStage.EnrichingPullRequests;
+
+    private static string CreateCheckpointFingerprint(
+        string pathOrUrl,
+        ExportOptions options)
+    {
+        var normalized = string.Join(
+            "|",
+            pathOrUrl.Trim(),
+            options.IncludeFileChanges,
+            options.IncludeBranchEvents,
+            options.IncludeMergeDetection,
+            options.EnrichmentKinds,
+            options.HistoryBackend,
+            options.DetectRenames,
+            options.StartDate?.ToUnixTimeSeconds() ?? -1,
+            options.EndDate?.ToUnixTimeSeconds() ?? -1,
+            options.GitLabBaseUrl.Trim());
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
+        return Convert.ToHexString(bytes);
+    }
+
+    private static string? GetRemoteOriginUrl(string repoPath)
+    {
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.StartInfo.ArgumentList.Add("-C");
+            process.StartInfo.ArgumentList.Add(repoPath);
+            process.StartInfo.ArgumentList.Add("remote");
+            process.StartInfo.ArgumentList.Add("get-url");
+            process.StartInfo.ArgumentList.Add("origin");
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+                return null;
+
+            var remoteUrl = output.Trim();
+            return string.IsNullOrWhiteSpace(remoteUrl) ? null : remoteUrl;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static bool IsGitCliAvailable()
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
             {
                 FileName = "git",
                 RedirectStandardOutput = true,
@@ -469,8 +740,8 @@ internal sealed class RepositoryExporter(
     {
         try
         {
-            using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
             {
                 FileName = "git",
                 RedirectStandardOutput = true,

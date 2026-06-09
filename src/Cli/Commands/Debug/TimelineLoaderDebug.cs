@@ -1,5 +1,5 @@
-using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Timelines;
+using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.Cli.Services;
 
 namespace ChangeTrace.Cli.Commands.Debug;
@@ -13,7 +13,7 @@ internal static class TimelineLoader
     /// <param name="filePath">Path to the MessagePack timeline file.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Deserialized timeline object, or null if a file does not exist.</returns>
-    public static async Task<Timeline?> LoadAsync(ISerializer<Timeline> serializer, string filePath, CancellationToken ct = default)
+    public static async Task<Timeline?> LoadAsync(ITimelineRepository repository, string filePath, CancellationToken ct = default)
     {
         if (!File.Exists(filePath))
         {
@@ -23,7 +23,7 @@ internal static class TimelineLoader
 
         try
         {
-            return await TimelineFileLoader.LoadAsync(serializer, filePath, ct);
+            return await TimelineFileLoader.LoadAsync(repository, filePath, ct);
         }
         catch (Exception ex)
         {

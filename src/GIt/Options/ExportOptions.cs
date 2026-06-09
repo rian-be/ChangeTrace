@@ -19,8 +19,8 @@ namespace ChangeTrace.GIt.Options;
 /// <param name="IncludeMergeDetection">
 /// Whether to detect merge commits explicitly. Defaults to <c>true</c>.
 /// </param>
-/// <param name="EnrichWithPullRequests">
-/// Whether to enrich the timeline with pull request events (GitHub/GitLab). Defaults to <c>true</c>.
+/// <param name="EnrichmentKinds">
+/// Which enrichment scopes to apply during export. Defaults to pull requests.
 /// </param>
 /// <param name="MaxCommits">
 /// Maximum number of commits to include. 0 means no limit. Defaults to <c>0</c>.
@@ -39,10 +39,12 @@ internal sealed record ExportOptions
     public string? GitHubToken { get; init; }
     public string? GitLabToken { get; init; }
     public string GitLabBaseUrl { get; init; } = "https://gitlab.com";
+    public string? CheckpointKey { get; init; }
+    public string? CheckpointFingerprint { get; init; }
     public bool IncludeFileChanges { get; init; } = true;
     public bool IncludeBranchEvents { get; init; } = true;
     public bool IncludeMergeDetection { get; init; } = true;
-    public bool EnrichWithPullRequests { get; init; } = true;
+    public ExportEnrichmentKind EnrichmentKinds { get; init; } = ExportEnrichmentKind.PullRequests;
     /// <summary>
     /// History backend used for commit and file-change extraction.
     /// <see cref="GitHistoryReaderBackend.GitCli"/> is usually the better choice for larger local histories.

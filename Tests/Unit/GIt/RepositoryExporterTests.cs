@@ -9,6 +9,7 @@ using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
+using ChangeTrace.GIt.Services.Checkpoints.Models;
 using Xunit;
 
 namespace ChangeTrace.Tests.GIt.Services;
@@ -23,7 +24,7 @@ public sealed class RepositoryExporterTests
         var commit = CreateCommitData(1_735_689_600);
         var reader = new TestGitRepositoryReader { CommitsToReturn = [commit] };
         var builder = new TestTimelineBuilder();
-        var exporter = CreateExporter(reader, builder, new TestTimelineRepository());
+        var exporter = CreateExporter(reader, builder, new TestTimelineRepository(), new TestExportCheckpointStore());
         var options = new ExportOptions
         {
             IncludeFileChanges = false,
@@ -63,7 +64,7 @@ public sealed class RepositoryExporterTests
             ReadResult = Result<IReadOnlyList<CommitData>>.Failure("read failed")
         };
         var builder = new TestTimelineBuilder();
-        var exporter = CreateExporter(reader, builder, new TestTimelineRepository());
+        var exporter = CreateExporter(reader, builder, new TestTimelineRepository(), new TestExportCheckpointStore());
 
         var result = await exporter.ExportAsync("https://github.com/rian-be/ChangeTrace.git", new ExportOptions());
 
@@ -79,7 +80,8 @@ public sealed class RepositoryExporterTests
         var reader = new TestGitRepositoryReader { CommitsToReturn = [CreateCommitData(1_735_689_600)] };
         var builder = new TestTimelineBuilder();
         var repository = new TestTimelineRepository();
-        var exporter = CreateExporter(reader, builder, repository);
+        var checkpointStore = new TestExportCheckpointStore();
+        var exporter = CreateExporter(reader, builder, repository, checkpointStore);
 
         var result = await exporter.ExportAndSaveAsync(
             "https://github.com/rian-be/ChangeTrace.git",
@@ -89,6 +91,53 @@ public sealed class RepositoryExporterTests
         Assert.True(result.IsSuccess);
         Assert.Same(builder.TimelineToReturn, repository.SavedTimeline);
         Assert.Equal("/tmp/output.gittrace", repository.SavedPath);
+        Assert.Collection(
+            checkpointStore.SavedCheckpoints,
+            checkpoint => Assert.Equal(ExportCheckpointStage.Built, checkpoint.Stage),
+            checkpoint => Assert.Equal(ExportCheckpointStage.SavingTimeline, checkpoint.Stage));
+    }
+
+    /// <summary>ExportAndSaveAsync resumes from an existing checkpoint instead of rebuilding the timeline.</summary>
+    [Fact]
+    public async Task ExportAndSaveAsync_ResumesFromCheckpointAndSkipsRebuild()
+    {
+        var checkpointTimeline = new Timeline(RepositoryId.Create("rian-be", "ChangeTrace").Value);
+        checkpointTimeline.AddEvent(TraceEventFactory.Commit(
+            Timestamp.Create(1_735_689_600).Value,
+            ActorName.Create("rian").Value,
+            CommitSha.Create("0123456789abcdef0123456789abcdef01234567").Value,
+            "checkpoint"));
+
+        var checkpointStore = new TestExportCheckpointStore
+        {
+            CheckpointToLoad = new ExportCheckpointState(
+                "fingerprint",
+                ExportCheckpointStage.SavingTimeline,
+                0,
+                0,
+                checkpointTimeline)
+        };
+
+        var reader = new TestGitRepositoryReader();
+        var builder = new TestTimelineBuilder();
+        var repository = new TestTimelineRepository();
+        var exporter = CreateExporter(reader, builder, repository, checkpointStore);
+
+        var result = await exporter.ExportAndSaveAsync(
+            "https://github.com/rian-be/ChangeTrace.git",
+            "/tmp/output.gittrace",
+            new ExportOptions
+            {
+                IncludeFileChanges = false,
+                IncludeBranchEvents = false,
+                IncludeMergeDetection = true,
+                EnrichmentKinds = ExportEnrichmentKind.PullRequests
+            });
+
+        Assert.True(result.IsSuccess, result.Error ?? "no error");
+        Assert.Null(builder.Commits);
+        Assert.Same(checkpointTimeline, repository.SavedTimeline);
+        Assert.Equal("/tmp/output.gittrace", checkpointStore.ClearedKey);
     }
 
     /// <summary>ExportAndSaveAsync propagates repository save failures.</summary>
@@ -97,7 +146,7 @@ public sealed class RepositoryExporterTests
     {
         var reader = new TestGitRepositoryReader { CommitsToReturn = [CreateCommitData(1_735_689_600)] };
         var repository = new TestTimelineRepository { SaveResult = Result.Failure("save failed") };
-        var exporter = CreateExporter(reader, new TestTimelineBuilder(), repository);
+        var exporter = CreateExporter(reader, new TestTimelineBuilder(), repository, new TestExportCheckpointStore());
 
         var result = await exporter.ExportAndSaveAsync(
             "https://github.com/rian-be/ChangeTrace.git",
@@ -117,7 +166,7 @@ public sealed class RepositoryExporterTests
         {
             var reader = new TestGitRepositoryReader { CommitsToReturn = [CreateCommitData(1_735_689_600)] };
             var builder = new TestTimelineBuilder();
-            var exporter = CreateExporter(reader, builder, new TestTimelineRepository());
+            var exporter = CreateExporter(reader, builder, new TestTimelineRepository(), new TestExportCheckpointStore());
 
             var result = await exporter.ExportAsync(repoPath, new ExportOptions
             {
@@ -139,13 +188,15 @@ public sealed class RepositoryExporterTests
     private static RepositoryExporter CreateExporter(
         IGitRepositoryReader reader,
         ITimelineBuilder builder,
-        ITimelineRepository repository)
+        ITimelineRepository repository,
+        IExportCheckpointStore checkpointStore)
         => new(
             reader,
             builder,
             repository,
             NullLogger<RepositoryExporter>.Instance,
-            new NoOpTimelineEnricherResolver());
+            new NoOpTimelineEnricherResolver(),
+            checkpointStore);
 
     /// <summary>Creates a commit fixture for repository exporter tests.</summary>
     private static CommitData CreateCommitData(long timestamp)
@@ -371,6 +422,49 @@ public sealed class RepositoryExporterTests
         /// <summary>Load is not used by repository exporter tests.</summary>
         public Task<Result<Timeline>> LoadAsync(string filePath, CancellationToken cancellationToken = default)
             => Task.FromResult(Result<Timeline>.Failure("not used"));
+    }
+
+    /// <summary>Checkpoint store test double that records checkpoint writes and returns configured state.</summary>
+    private sealed class TestExportCheckpointStore : IExportCheckpointStore
+    {
+        public ExportCheckpointState? CheckpointToLoad { get; set; }
+        public List<ExportCheckpointState> SavedCheckpoints { get; } = [];
+        public string? LoadedKey { get; private set; }
+        public string? SavedKey { get; private set; }
+        public string? ClearedKey { get; private set; }
+
+        public Task<ExportCheckpointState?> TryLoad(
+            string checkpointKey,
+            string expectedFingerprint,
+            CancellationToken cancellationToken = default)
+        {
+            LoadedKey = checkpointKey;
+            return Task.FromResult(CheckpointToLoad);
+        }
+
+        public Task Save(
+            string checkpointKey,
+            ExportCheckpointState state,
+            CancellationToken cancellationToken = default)
+        {
+            SavedKey = checkpointKey;
+            SavedCheckpoints.Add(state);
+            return Task.CompletedTask;
+        }
+
+        public Task AppendPullRequestPatch(
+            string checkpointKey,
+            ExportCheckpointState state,
+            int targetIndex,
+            TraceEvent updatedEvent,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task Clear(string checkpointKey, CancellationToken cancellationToken = default)
+        {
+            ClearedKey = checkpointKey;
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>Timeline enricher resolver test double that intentionally resolves nothing.</summary>

@@ -2,8 +2,8 @@ using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.Core.Diagnostics;
-using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Timelines;
+using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.Graphics.Window;
 using ChangeTrace.Player.Factory;
 using ChangeTrace.Rendering.Factory;
@@ -17,7 +17,7 @@ namespace ChangeTrace.Cli.Handlers.Debug;
 /// </summary>
 [AutoRegister(ServiceLifetime.Transient, typeof(WindowDebugCommandHandler))]
 internal sealed class WindowDebugCommandHandler(
-    ISerializer<Timeline> serializer,
+    ITimelineRepository repository,
     ITimelinePlayerFactory playerFactory,
     IRenderSystemFactory renderFactory,
     IDiagnosticsProvider diagnostics) : ICliHandler
@@ -45,7 +45,7 @@ internal sealed class WindowDebugCommandHandler(
 
             Console.WriteLine($"[cyan]File size: {fileSize} bytes[/]");
 
-            var timeline = await TimelineFileLoader.LoadAsync(serializer, filePath, ct);
+            var timeline = await TimelineFileLoader.LoadAsync(repository, filePath, ct);
 
             Console.WriteLine($"[green]Timeline loaded: {timeline.Events.Count} events[/]");
 

@@ -4,7 +4,7 @@ using ChangeTrace.Core.Models;
 using MessagePack;
 using Model = ChangeTrace.Core.Models;
 
-namespace ChangeTrace.GIt.Dto;
+namespace ChangeTrace.GIt.Dto.Timelines;
 
 /// <summary>
 /// Data Transfer Object representing a <see cref="TraceEvent"/>.
@@ -12,9 +12,9 @@ namespace ChangeTrace.GIt.Dto;
 /// </summary>
 /// <remarks>
 /// This DTO captures all relevant properties of a timeline event, including
-/// - Commit, branch, and pull request metadata  
-/// - File changes  
-/// - Merge events  
+/// - Commit, branch, and pull request metadata
+/// - File changes
+/// - Merge events
 /// Provides conversion to/from the domain <see cref="TraceEvent"/> via <see cref="FromDomain"/> and <see cref="ToDomain"/>.
 /// Immutable record with optional fields to allow partial data.
 /// </remarks>
@@ -104,7 +104,7 @@ internal sealed record TraceEventDto
             ? TraceEventFactory.FileChange(timestamp, actor, path, changeType.Value, sha, Metadata)
             : null;
     }
-    
+
     private TraceEvent? CreateBranch(
         Timestamp timestamp,
         ActorName actor,
@@ -117,7 +117,7 @@ internal sealed record TraceEventDto
             ? TraceEventFactory.Branch(timestamp, actor, branch, branchType.Value, sha, Metadata)
             : null;
     }
-    
+
     private static TEnum? TryParseEnum<TEnum>(string? value) where TEnum : struct =>
         value != null && Enum.TryParse<TEnum>(value, out var r) ? r : null;
 }
