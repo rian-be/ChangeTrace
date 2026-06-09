@@ -18,5 +18,6 @@ internal sealed record DeviceCodeResponse(
     string device_code,
     string user_code,
     string verification_uri,
+    string? verification_uri_complete,
     int expires_in,
     int interval);

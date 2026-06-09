@@ -5,3 +5,4 @@ publish/
 nupkg/
 .obsidian/
 BenchmarkDotNet.Artifacts/
+.env

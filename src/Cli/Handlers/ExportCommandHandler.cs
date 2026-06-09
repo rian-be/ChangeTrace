@@ -44,6 +44,7 @@ internal sealed class ExportCommandHandler(
 
         var output = explicitOutput;
         var workspace = workspaceContext.Current;
+        var provider = TryDetectProvider(repo);
 
         if (string.IsNullOrWhiteSpace(output))
         {
@@ -65,7 +66,6 @@ internal sealed class ExportCommandHandler(
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            var provider = TryDetectProvider(repo);
             if (provider is not null)
             {
                 var session = await sessionAuthStore.GetSession(provider, ct);
@@ -75,7 +75,8 @@ internal sealed class ExportCommandHandler(
 
         var options = new ExportOptions
         {
-            GitHubToken = token,
+            GitHubToken = provider == "github" ? token : null,
+            GitLabToken = provider == "gitlab" ? token : null,
             IncludeMergeDetection = true,
             EnrichWithPullRequests = true,
             IncludeBranchEvents = true,

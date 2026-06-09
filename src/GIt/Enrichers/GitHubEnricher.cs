@@ -5,6 +5,7 @@ using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Options;
+using ChangeTrace.GIt.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,10 +22,15 @@ namespace ChangeTrace.GIt.Enrichers;
 /// Matches PRs against commits or branches in the timeline and attaches PR metadata.
 /// Handles pagination, API rate limits, and errors gracefully.
 /// </remarks>
-[AutoRegister(ServiceLifetime.Singleton)]
-internal sealed class GitHubEnricher : BasePlatformEnricher
+[AutoRegister(ServiceLifetime.Singleton, typeof(IProviderTimelineEnricher))]
+internal sealed class GitHubEnricher : BasePlatformEnricher, IProviderTimelineEnricher
 {
     private readonly GitHubClient _client;
+
+    /// <summary>
+    /// Provider handled by this enricher.
+    /// </summary>
+    public string Provider => "github";
     
     public GitHubEnricher(IOptions<ExportOptions> options,  ILogger<GitHubEnricher> logger)
         : base(logger)
@@ -76,8 +82,12 @@ internal sealed class GitHubEnricher : BasePlatformEnricher
                 var prType = MapPrState(pr.Merged, pr.State.StringValue);
                 var metadata = $"PR#{pr.Number} by {pr.User.Login} -> {pr.Base.Ref}";
 
-                EnrichTraceEventWithPr(targetEvent.Value, prNumber, prType, metadata);
-                matched++;
+                var updated = timeline.TryUpdateFirst(
+                    evt => evt.Equals(targetEvent.Value),
+                    evt => EnrichTraceEventWithPr(evt, prNumber, prType, metadata));
+
+                if (updated)
+                    matched++;
             }
 
             Logger.LogInformation("Enrichment complete: {Matched}/{Total} matched", matched, allPRs.Count);

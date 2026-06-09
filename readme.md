@@ -60,7 +60,9 @@ Typical workspace usage:
 
 ```bash
 ./changetrace auth login github
+./changetrace auth login codeberg
 ./changetrace org create microsoft -p github
+./changetrace org create codeberg -p codeberg
 ./changetrace ws create msquic --org microsoft
 ./changetrace ws use microsoft msquic
 ./changetrace export https://github.com/microsoft/msquic.git
@@ -80,6 +82,8 @@ Direct file export is still available when you want a specific output path:
 ./changetrace export https://github.com/microsoft/WSL.git -o timeline.gittrace
 ./changetrace show timeline.gittrace
 ```
+
+`codeberg` opens a preset for `codeberg.org`. `custom` starts an OIDC login flow for your own provider.
 
 For local development, build the project and use `./changetrace` as the local command. It can point to the built binary under `bin/Debug/net10.0/`.
 

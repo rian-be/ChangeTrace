@@ -1,5 +1,6 @@
 using System.CommandLine;
 using ChangeTrace.Cli.Interfaces;
+using ChangeTrace.Cli.Prompts;
 using ChangeTrace.Configuration;
 using ChangeTrace.Configuration.Discovery;
 using ChangeTrace.CredentialTrace;
@@ -21,7 +22,9 @@ namespace ChangeTrace.Cli.Handlers.Auth;
 /// </list>
 /// </remarks>
 [AutoRegister(ServiceLifetime.Transient, typeof(LoginCommandHandler))]
-internal sealed class LoginCommandHandler(IAuthService auth) : ICliHandler
+internal sealed class LoginCommandHandler(
+    IAuthService auth,
+    IEnumerable<IAuthProvider> providers) : ICliHandler
 {
     /// <summary>
     /// Executes 'login' command asynchronously.
@@ -30,21 +33,29 @@ internal sealed class LoginCommandHandler(IAuthService auth) : ICliHandler
     /// <param name="ct">Cancellation token.</param>
     public async Task HandleAsync(ParseResult parseResult, CancellationToken ct)
     {
-        var provider = parseResult.GetValue<string>("provider")!;
-        
+        var provider = parseResult.GetValue<string>("--provider");
+
+        if (string.IsNullOrWhiteSpace(provider))
+            provider = ProviderPrompt.SelectProvider(providers);
+
+        if (string.IsNullOrWhiteSpace(provider))
+            return;
+
         AuthSession session;
         try
         {
-            session = await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .SpinnerStyle(Style.Parse("blue"))
-                .StartAsync($"Logging into [bold]{provider}[/]...", async ctx =>
-                {
-                    var s = await auth.FetchSession(provider, ct);
-                    ctx.Status("Finalizing login...");
-                    await Task.Delay(300, ct); 
-                    return s;
-                });
+            session = ShouldUseStatus(provider)
+                ? await AnsiConsole.Status()
+                    .Spinner(Spinner.Known.Dots)
+                    .SpinnerStyle(Style.Parse("blue"))
+                    .StartAsync($"Logging into [bold]{provider}[/]...", async ctx =>
+                    {
+                        var s = await auth.FetchSession(provider, ct);
+                        ctx.Status("Finalizing login...");
+                        await Task.Delay(300, ct);
+                        return s;
+                    })
+                : await auth.FetchSession(provider, ct);
         }
         catch (Exception ex)
         {
@@ -79,4 +90,7 @@ internal sealed class LoginCommandHandler(IAuthService auth) : ICliHandler
                 .Padding(1, 1)
         );
     }
+
+    private static bool ShouldUseStatus(string provider)
+        => !string.Equals(provider, "custom", StringComparison.OrdinalIgnoreCase);
 }
