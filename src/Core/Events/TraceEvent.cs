@@ -115,6 +115,45 @@ internal readonly struct TraceEvent
             _parts | TraceEventParts.PullRequest);
 
     /// <summary>
+    /// Returns a copy of this <see cref="TraceEvent"/> without pull request info.
+    /// </summary>
+    public TraceEvent WithoutPullRequest()
+        => new(
+            Core,
+            _commit,
+            _branch,
+            _pullRequest,
+            _metadata,
+            _relativeTime,
+            _parts & ~TraceEventParts.PullRequest);
+
+    /// <summary>
+    /// Returns a copy of this <see cref="TraceEvent"/> with updated branch info.
+    /// </summary>
+    public TraceEvent WithBranch(BranchName name, BranchEventType type)
+        => new(
+            Core,
+            _commit,
+            new BranchInfo(name, type),
+            _pullRequest,
+            _metadata,
+            _relativeTime,
+            _parts | TraceEventParts.Branch);
+
+    /// <summary>
+    /// Returns a copy of this <see cref="TraceEvent"/> without branch info.
+    /// </summary>
+    public TraceEvent WithoutBranch()
+        => new(
+            Core,
+            _commit,
+            _branch,
+            _pullRequest,
+            _metadata,
+            _relativeTime,
+            _parts & ~TraceEventParts.Branch);
+
+    /// <summary>
     /// Computes the relative time from a base timestamp and optional scale factor.
     /// </summary>
     /// <param name="baseTime">The reference base timestamp.</param>

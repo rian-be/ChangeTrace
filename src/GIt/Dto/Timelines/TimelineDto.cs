@@ -1,9 +1,10 @@
 using ChangeTrace.Core.Timelines;
+using ChangeTrace.GIt.Dto.Common;
 using MessagePack;
 
 using Model = ChangeTrace.Core.Models;
 
-namespace ChangeTrace.GIt.Dto;
+namespace ChangeTrace.GIt.Dto.Timelines;
 
 /// <summary>
 /// Data Transfer Object representing <see cref="Timeline"/>.
