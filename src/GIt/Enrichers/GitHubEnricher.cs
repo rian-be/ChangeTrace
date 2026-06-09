@@ -6,9 +6,10 @@ using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Interfaces;
+using ChangeTrace.GIt.Services;
+using ChangeTrace.GIt.Services.Checkpoints.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Octokit;
 
 namespace ChangeTrace.GIt.Enrichers;
@@ -23,26 +24,15 @@ namespace ChangeTrace.GIt.Enrichers;
 /// Handles pagination, API rate limits, and errors gracefully.
 /// </remarks>
 [AutoRegister(ServiceLifetime.Singleton, typeof(IProviderTimelineEnricher))]
-internal sealed class GitHubEnricher : BasePlatformEnricher, IProviderTimelineEnricher
+internal sealed class GitHubEnricher(
+    ILogger<GitHubEnricher> logger,
+    IExportCheckpointStore checkpointStore)
+    : BasePlatformEnricher(logger), IProviderTimelineEnricher
 {
-    private readonly GitHubClient _client;
-
     /// <summary>
     /// Provider handled by this enricher.
     /// </summary>
     public string Provider => "github";
-    
-    public GitHubEnricher(IOptions<ExportOptions> options,  ILogger<GitHubEnricher> logger)
-        : base(logger)
-    {
-        var githubToken = options.Value.GitHubToken;
-        _client = new GitHubClient(new ProductHeaderValue("ChangeTrace"));
-
-        if (!string.IsNullOrEmpty(githubToken))
-            _client.Credentials = new Credentials(githubToken);
-        else
-            Logger.LogWarning("No GitHub token - rate limits apply");
-    }
 
     /// <summary>
     /// Enriches the timeline with GitHub pull requests.
@@ -51,59 +41,150 @@ internal sealed class GitHubEnricher : BasePlatformEnricher, IProviderTimelineEn
     /// <param name="repositoryId">Repository identifier</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Number of PRs processed, matched, and unmatched in <see cref="EnrichmentResult"/></returns>
-    public override async Task<Result<EnrichmentResult>> EnrichAsync(
+    public override async Task<Result<EnrichmentResult>> Enrich(
         Timeline timeline,
         RepositoryId repositoryId,
+        ExportOptions options,
         CancellationToken cancellationToken = default)
     {
         try
         {
             Logger.LogInformation("Fetching PRs from {Repo}", repositoryId.FullName);
 
-            var allPRs = await FetchAllPullRequestsAsync(repositoryId.Owner, repositoryId.Name, cancellationToken);
-
-            if (!allPRs.Any())
+            if (string.IsNullOrWhiteSpace(options.GitHubToken))
             {
-                Logger.LogWarning("No PRs found");
+                Logger.LogWarning(
+                    "GitHub enrichment is running without a token. Anonymous requests have a much lower rate limit.");
+            }
+
+            var checkpoint = await LoadCheckpointAsync(options, cancellationToken);
+            var resumePage = checkpoint?.Stage == ExportCheckpointStage.EnrichingPullRequests
+                ? Math.Max(1, checkpoint.NextPullRequestPage)
+                : 1;
+            var resumeIndex = checkpoint?.Stage == ExportCheckpointStage.EnrichingPullRequests
+                ? Math.Max(0, checkpoint.NextPullRequestIndex)
+                : 0;
+
+            if (checkpoint is not null &&
+                checkpoint.Stage is ExportCheckpointStage.Built or ExportCheckpointStage.EnrichingPullRequests)
+            {
+                timeline.Clear();
+                timeline.AddEvents(checkpoint.Timeline.Events);
+            }
+
+            var client = CreateClient(options);
+
+            int matched = 0;
+            int total = 0;
+            var wasRateLimited = false;
+
+            for (var page = resumePage; !cancellationToken.IsCancellationRequested; page++)
+            {
+                IReadOnlyList<PullRequest> prs;
+
+                try
+                {
+                    prs = await client.PullRequest.GetAllForRepository(
+                        repositoryId.Owner,
+                        repositoryId.Name,
+                        new PullRequestRequest { State = ItemStateFilter.All },
+                        new ApiOptions { PageCount = 1, PageSize = 100, StartPage = page });
+                }
+                catch (RateLimitExceededException ex)
+                {
+                    wasRateLimited = true;
+                    Logger.LogWarning(ex, "GitHub rate limit exceeded while fetching page {Page}", page);
+                    break;
+                }
+
+                if (!prs.Any())
+                    break;
+
+                total += prs.Count;
+
+                for (var index = page == resumePage ? resumeIndex : 0; index < prs.Count; index++)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        return Result<EnrichmentResult>.Failure("Cancelled");
+
+                    var pr = prs[index];
+                    var targetIndex = FindMatchingEventIndex(timeline, pr);
+                    if (targetIndex is null)
+                        continue;
+
+                    var prNumber = PullRequestNumber.Create(pr.Number).Value;
+                    var prType = MapPrState(pr.Merged, pr.State.StringValue);
+                    var metadata = $"PR#{pr.Number} by {pr.User.Login} -> {pr.Base.Ref}";
+
+                    var updated = timeline.TryUpdateAt(
+                        targetIndex.Value,
+                        evt => EnrichTraceEventWithPr(evt, prNumber, prType, metadata));
+
+                    if (!updated)
+                        continue;
+
+                    matched++;
+
+                    await SavePatchAsync(
+                        options,
+                        timeline,
+                        page,
+                        index + 1,
+                        targetIndex.Value,
+                        timeline.Events[targetIndex.Value],
+                        cancellationToken);
+                }
+
+                resumeIndex = 0;
+                await SaveSnapshotAsync(
+                    options,
+                    timeline,
+                    ExportCheckpointStage.EnrichingPullRequests,
+                    page + 1,
+                    0,
+                    cancellationToken);
+            }
+
+            if (total == 0)
+            {
+                if (wasRateLimited)
+                    Logger.LogWarning("GitHub rate limit reached before any PRs could be fetched; skipping PR enrichment.");
+                else
+                    Logger.LogWarning("No PRs found");
+
+                await SaveSnapshotAsync(
+                    options,
+                    timeline,
+                    ExportCheckpointStage.Enriched,
+                    0,
+                    0,
+                    cancellationToken);
+
                 return Result<EnrichmentResult>.Success(new EnrichmentResult(0, 0, 0));
             }
 
-            int matched = 0;
-
-            foreach (var pr in allPRs)
+            if (wasRateLimited)
             {
-                if (cancellationToken.IsCancellationRequested)
-                    return Result<EnrichmentResult>.Failure("Cancelled");
-
-                var targetEvent = FindMatchingEvent(timeline, pr);
-                if (targetEvent == null) continue;
-                
-                var prNumber = PullRequestNumber.Create(pr.Number).Value;
-                var prType = MapPrState(pr.Merged, pr.State.StringValue);
-                var metadata = $"PR#{pr.Number} by {pr.User.Login} -> {pr.Base.Ref}";
-
-                var updated = timeline.TryUpdateFirst(
-                    evt => evt.Equals(targetEvent.Value),
-                    evt => EnrichTraceEventWithPr(evt, prNumber, prType, metadata));
-
-                if (updated)
-                    matched++;
+                Logger.LogWarning(
+                    "GitHub rate limit reached after fetching {Count} pull requests; continuing with partial enrichment.",
+                    total);
             }
 
-            Logger.LogInformation("Enrichment complete: {Matched}/{Total} matched", matched, allPRs.Count);
-            return Result<EnrichmentResult>.Success(new EnrichmentResult(allPRs.Count, matched, allPRs.Count - matched));
+            await SaveSnapshotAsync(
+                options,
+                timeline,
+                ExportCheckpointStage.Enriched,
+                0,
+                0,
+                cancellationToken);
+
+            Logger.LogInformation("Enrichment complete: {Matched}/{Total} matched", matched, total);
+            return Result<EnrichmentResult>.Success(new EnrichmentResult(total, matched, total - matched));
         }
-        catch (Exception ex) when (ex is RateLimitExceededException or NotFoundException)
+        catch (NotFoundException ex)
         {
-            var message = ex switch
-            {
-                RateLimitExceededException => "GitHub rate limit exceeded",
-                NotFoundException => "Repository not found",
-                _ => "GitHub enrichment failed"
-            };
-            
-            Logger.LogError(ex, message);
-            return Result<EnrichmentResult>.Failure(message, ex);
+            Logger.LogError(ex, "Repository not found");
+            return Result<EnrichmentResult>.Failure("Repository not found", ex);
         }
         catch (Exception ex)
         {
@@ -113,77 +194,164 @@ internal sealed class GitHubEnricher : BasePlatformEnricher, IProviderTimelineEn
     }
 
     /// <summary>
-    /// Fetches all pull requests for the repository, handling pagination.
+    /// Creates the GitHub client.
     /// </summary>
-    private async Task<List<PullRequest>> FetchAllPullRequestsAsync(string owner, string repoName, CancellationToken cancellationToken)
+    private static GitHubClient CreateClient(ExportOptions options)
     {
-        var allPRs = new List<PullRequest>();
-        int page = 1;
+        var client = new GitHubClient(new ProductHeaderValue("ChangeTrace"));
 
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            Logger.LogDebug("Fetching page {Page}", page);
+        if (!string.IsNullOrWhiteSpace(options.GitHubToken))
+            client.Credentials = new Credentials(options.GitHubToken);
 
-            var prs = await _client.PullRequest.GetAllForRepository(
-                owner,
-                repoName,
-                new PullRequestRequest { State = ItemStateFilter.All },
-                new ApiOptions { PageCount = 1, PageSize = 100, StartPage = page }
-            );
-
-            if (!prs.Any())
-                break;
-
-            allPRs.AddRange(prs);
-            page++;
-        }
-
-        return allPRs;
+        return client;
     }
 
     /// <summary>
-    /// Attempts to find the timeline event that matches the given PR via merge SHA, head SHA, or branch name.
+    /// Attempts to find the timeline event index that matches the given PR via merge SHA, head SHA, or branch name.
     /// </summary>
-    private TraceEvent? FindMatchingEvent(Timeline timeline, PullRequest pr)
+    private int? FindMatchingEventIndex(Timeline timeline, PullRequest pr)
     {
-        TraceEvent? targetEvent = null;
-
         // 1. Merge commit SHA
         if (!string.IsNullOrEmpty(pr.MergeCommitSha))
         {
             var shaResult = CommitSha.Create(pr.MergeCommitSha);
             if (shaResult.IsSuccess)
             {
-               targetEvent = timeline.FindFirst(e => e.Commit?.Sha != null && e.Commit.Value.Sha.Matches(shaResult.Value));
-                if (targetEvent != null)
+                var match = FindFirstIndex(timeline, e => e.Commit?.Sha != null && e.Commit.Value.Sha.Matches(shaResult.Value));
+                if (match is not null)
+                {
                     Logger.LogDebug("PR #{Number} matched via merge SHA", pr.Number);
+                    return match.Value.Index;
+                }
             }
         }
 
         // 2. Head SHA
-        if (targetEvent == null && pr.Head?.Sha != null)
+        if (pr.Head?.Sha != null)
         {
             var shaResult = CommitSha.Create(pr.Head.Sha);
             if (shaResult.IsSuccess)
             {
-                targetEvent = timeline.FindFirst(e => e.Commit?.Sha != null && e.Commit.Value.Sha.Matches(shaResult.Value));
-                if (targetEvent != null)
+                var match = FindFirstIndex(timeline, e => e.Commit?.Sha != null && e.Commit.Value.Sha.Matches(shaResult.Value));
+                if (match is not null)
+                {
                     Logger.LogDebug("PR #{Number} matched via head SHA", pr.Number);
+                    return match.Value.Index;
+                }
             }
         }
 
         // 3. Branch name
-        if (targetEvent == null && !string.IsNullOrEmpty(pr.Head?.Ref))
+        if (!string.IsNullOrEmpty(pr.Head?.Ref))
         {
             var branchResult = BranchName.Create(pr.Head.Ref);
             if (branchResult.IsSuccess)
             {
-                targetEvent = timeline.FindFirst(e => e.Branch?.Name != null && e.Branch.Value.Name == branchResult.Value);
-                if (targetEvent != null)
+                var match = FindFirstIndex(timeline, e => e.Branch?.Name != null && e.Branch.Value.Name == branchResult.Value);
+                if (match is not null)
+                {
                     Logger.LogDebug("PR #{Number} matched via branch", pr.Number);
+                    return match.Value.Index;
+                }
             }
         }
 
-        return targetEvent;
+        return null;
+    }
+
+    private static (int Index, TraceEvent Event)? FindFirstIndex(Timeline timeline, Func<TraceEvent, bool> predicate)
+    {
+        var events = timeline.EventsSpan;
+        for (var index = 0; index < events.Length; index++)
+        {
+            var evt = events[index];
+            if (predicate(evt))
+                return (index, evt);
+        }
+
+        return null;
+    }
+
+    private async Task<ExportCheckpointState?> LoadCheckpointAsync(
+        ExportOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.CheckpointKey) ||
+            string.IsNullOrWhiteSpace(options.CheckpointFingerprint))
+        {
+            return null;
+        }
+
+        return await checkpointStore.TryLoad(
+            options.CheckpointKey,
+            options.CheckpointFingerprint,
+            cancellationToken);
+    }
+
+    private async Task SaveSnapshotAsync(
+        ExportOptions options,
+        Timeline timeline,
+        ExportCheckpointStage stage,
+        int nextPullRequestPage,
+        int nextPullRequestIndex,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.CheckpointKey) ||
+            string.IsNullOrWhiteSpace(options.CheckpointFingerprint))
+        {
+            return;
+        }
+
+        try
+        {
+            await checkpointStore.Save(
+                options.CheckpointKey,
+                new ExportCheckpointState(
+                    options.CheckpointFingerprint,
+                    stage,
+                    nextPullRequestPage,
+                    nextPullRequestIndex,
+                    timeline),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to persist PR enrichment checkpoint snapshot for {Stage}; continuing.", stage);
+        }
+    }
+
+    private async Task SavePatchAsync(
+        ExportOptions options,
+        Timeline timeline,
+        int nextPullRequestPage,
+        int nextPullRequestIndex,
+        int targetIndex,
+        TraceEvent updatedEvent,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.CheckpointKey) ||
+            string.IsNullOrWhiteSpace(options.CheckpointFingerprint))
+        {
+            return;
+        }
+
+        try
+        {
+            await checkpointStore.AppendPullRequestPatch(
+                options.CheckpointKey,
+                new ExportCheckpointState(
+                    options.CheckpointFingerprint,
+                    ExportCheckpointStage.EnrichingPullRequests,
+                    nextPullRequestPage,
+                    nextPullRequestIndex,
+                    timeline),
+                targetIndex,
+                updatedEvent,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to persist PR enrichment patch; continuing.");
+        }
     }
 }
