@@ -1,12 +1,10 @@
 using ChangeTrace.Configuration.Discovery;
-using ChangeTrace.Core;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Interfaces;
-using ChangeTrace.GIt.Services;
 using ChangeTrace.GIt.Services.Checkpoints.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,7 +22,7 @@ namespace ChangeTrace.GIt.Enrichers;
 /// Handles pagination, API rate limits, and errors gracefully.
 /// </remarks>
 [AutoRegister(ServiceLifetime.Singleton, typeof(IProviderTimelineEnricher))]
-internal sealed class GitHubEnricher(
+internal class GitHubEnricher(
     ILogger<GitHubEnricher> logger,
     IExportCheckpointStore checkpointStore)
     : BasePlatformEnricher(logger), IProviderTimelineEnricher
@@ -84,11 +82,11 @@ internal sealed class GitHubEnricher(
 
                 try
                 {
-                    prs = await client.PullRequest.GetAllForRepository(
-                        repositoryId.Owner,
-                        repositoryId.Name,
-                        new PullRequestRequest { State = ItemStateFilter.All },
-                        new ApiOptions { PageCount = 1, PageSize = 100, StartPage = page });
+                    prs = await FetchPullRequestsPage(
+                        client,
+                        repositoryId,
+                        page,
+                        cancellationToken);
                 }
                 catch (RateLimitExceededException ex)
                 {
@@ -147,10 +145,9 @@ internal sealed class GitHubEnricher(
 
             if (total == 0)
             {
-                if (wasRateLimited)
-                    Logger.LogWarning("GitHub rate limit reached before any PRs could be fetched; skipping PR enrichment.");
-                else
-                    Logger.LogWarning("No PRs found");
+                Logger.LogWarning(wasRateLimited
+                    ? "GitHub rate limit reached before any PRs could be fetched; skipping PR enrichment."
+                    : "No PRs found");
 
                 await SaveSnapshotAsync(
                     options,
@@ -183,8 +180,20 @@ internal sealed class GitHubEnricher(
         }
         catch (NotFoundException ex)
         {
-            Logger.LogError(ex, "Repository not found");
-            return Result<EnrichmentResult>.Failure("Repository not found", ex);
+            Logger.LogWarning(
+                ex,
+                "GitHub pull request data is unavailable for {Repo}; skipping PR enrichment.",
+                repositoryId.FullName);
+
+            await SaveSnapshotAsync(
+                options,
+                timeline,
+                ExportCheckpointStage.Enriched,
+                0,
+                0,
+                cancellationToken);
+
+            return Result<EnrichmentResult>.Success(new EnrichmentResult(0, 0, 0));
         }
         catch (Exception ex)
         {
@@ -205,6 +214,20 @@ internal sealed class GitHubEnricher(
 
         return client;
     }
+
+    /// <summary>
+    /// Fetches one page of GitHub pull requests. Overridable for tests that exercise API failure handling.
+    /// </summary>
+    protected virtual Task<IReadOnlyList<PullRequest>> FetchPullRequestsPage(
+        GitHubClient client,
+        RepositoryId repositoryId,
+        int page,
+        CancellationToken cancellationToken)
+        => client.PullRequest.GetAllForRepository(
+            repositoryId.Owner,
+            repositoryId.Name,
+            new PullRequestRequest { State = ItemStateFilter.All },
+            new ApiOptions { PageCount = 1, PageSize = 100, StartPage = page });
 
     /// <summary>
     /// Attempts to find the timeline event index that matches the given PR via merge SHA, head SHA, or branch name.
