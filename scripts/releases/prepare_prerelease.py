@@ -30,6 +30,9 @@ def main() -> int:
 
     github_output = require_env("GITHUB_OUTPUT")[0]
 
+    # Sanitize release_name to prevent GitHub Actions environment variable injection
+    release_name = release_name.replace("\n", "").replace("\r", "")
+
     with open(github_output, "a", encoding="utf-8") as handle:
         handle.write(f"tag_name={tag_name}\n")
         handle.write(f"release_version={tag_name.removeprefix('v')}\n")
