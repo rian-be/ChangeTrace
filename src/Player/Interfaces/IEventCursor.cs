@@ -21,6 +21,9 @@ internal interface IEventCursor
     /// <summary>Event at current cursor position, or null if out of bounds.</summary>
     TraceEvent? CurrentEvent { get; }
 
+    /// <summary>Gets event at a specific timeline index.</summary>
+    TraceEvent GetEventAt(int index);
+
     /// <summary>First event in the timeline, or null if empty.</summary>
     TraceEvent? FirstEvent { get; }
     
@@ -44,11 +47,25 @@ internal interface IEventCursor
     IReadOnlyList<TraceEvent> DrainForward(double virtualNow);
 
     /// <summary>
+    /// Advances the cursor forward and returns the drained event range without allocating a batch list.
+    /// </summary>
+    /// <param name="virtualNow">Virtual time to drain events up to.</param>
+    /// <returns>Start index and count of drained events.</returns>
+    (int StartIndex, int Count) DrainForwardRange(double virtualNow);
+
+    /// <summary>
     /// Retrieves events backward from current cursor until given virtual time.
     /// </summary>
     /// <param name="virtualNow">Virtual time to drain events down to.</param>
     /// <returns>Read-only list of events drained.</returns>
     IReadOnlyList<TraceEvent> DrainBackward(double virtualNow);
+
+    /// <summary>
+    /// Retreats the cursor backward and returns the drained event range without allocating a batch list.
+    /// </summary>
+    /// <param name="virtualNow">Virtual time to drain events down to.</param>
+    /// <returns>Start index and count of drained events.</returns>
+    (int StartIndex, int Count) DrainBackwardRange(double virtualNow);
 
     /// <summary>
     /// Steps cursor forward by one event.

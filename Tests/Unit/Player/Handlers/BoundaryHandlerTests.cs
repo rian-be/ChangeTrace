@@ -75,6 +75,9 @@ public sealed class BoundaryHandlerTests
         /// <summary>Current event, unused by boundary handlers.</summary>
         public TraceEvent? CurrentEvent => null;
 
+        /// <summary>Specific event lookup, unused by boundary handlers.</summary>
+        public TraceEvent GetEventAt(int index) => default;
+
         /// <summary>First event, unused by boundary handlers.</summary>
         public TraceEvent? FirstEvent => null;
 
@@ -93,8 +96,14 @@ public sealed class BoundaryHandlerTests
         /// <summary>Returns no drained events.</summary>
         public IReadOnlyList<TraceEvent> DrainForward(double virtualNow) => [];
 
+        /// <summary>Returns an empty forward range.</summary>
+        public (int StartIndex, int Count) DrainForwardRange(double virtualNow) => (0, 0);
+
         /// <summary>Returns no drained events.</summary>
         public IReadOnlyList<TraceEvent> DrainBackward(double virtualNow) => [];
+
+        /// <summary>Returns an empty backward range.</summary>
+        public (int StartIndex, int Count) DrainBackwardRange(double virtualNow) => (0, 0);
 
         /// <summary>Reports no forward step.</summary>
         public (TraceEvent? Event, bool Moved) TryStepForward() => (null, false);
