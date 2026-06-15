@@ -57,17 +57,22 @@ internal sealed class PlayerDebugAggregation
         var commitWriter = new SemanticEventWriter<CommitBundleEvent>(1000);
         var branchWriter = new SemanticEventWriter<BranchEvent>(1000);
         var mergeWriter = new SemanticEventWriter<MergeEvent>(1000);
+        var mergeMetadata = new MergeMetadataAggregator();
+        var mergeCommitAggregator = new MergeCommitAggregator(mergeWriter, mergeMetadata);
 
         var aggregators = new IEventAggregator<TraceEvent>[]
         {
-            new CommitBundlingAggregator(commitWriter),
+            new CommitBundlingAggregator(
+                commitWriter,
+                onEmit: mergeCommitAggregator.Process),
             new BranchAggregator(branchWriter),
-            new MergeAggregator(mergeWriter)
+            mergeMetadata
         };
 
         using (var engine = new EventAggregationEngine<TraceEvent>(aggregators))
         {
             engine.Process(timeline.EventsSpan);
+            mergeCommitAggregator.Flush();
         }
 
         var commitsBySha = new Dictionary<string, CommitBundleEvent>();

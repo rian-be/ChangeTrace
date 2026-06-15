@@ -20,7 +20,8 @@ namespace ChangeTrace.Core.Aggregators;
 /// </list>
 /// </remarks>
 internal sealed class CommitBundlingAggregator(
-    SemanticEventWriter<CommitBundleEvent> writer)
+    SemanticEventWriter<CommitBundleEvent> writer,
+    Action<CommitBundleEvent>? onEmit = null)
     : IEventAggregator<TraceEvent>, IDisposable
 {
     private readonly Dictionary<string, CommitBuilder> _builders = new(128);
@@ -61,7 +62,9 @@ internal sealed class CommitBundlingAggregator(
         foreach (var builder in _builders.Values)
         {
             if (!builder.IsReady || builder.FilesCount == 0) continue;
-            writer.Write(builder.BuildEvent());
+            var bundle = builder.BuildEvent();
+            writer.Write(bundle);
+            onEmit?.Invoke(bundle);
             builder.Clear();
         }
 

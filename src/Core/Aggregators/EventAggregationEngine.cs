@@ -28,9 +28,19 @@ internal sealed class EventAggregationEngine<TIn> : IDisposable
         IEnumerable<IEventAggregator<TIn>> aggregators,
         int batchSize = 1024)
     {
-        _aggregators = aggregators.ToArray();
+        _aggregators = aggregators as IEventAggregator<TIn>[] ?? aggregators.ToArray();
         _disposables = _aggregators.OfType<IDisposable>().ToArray();
         _batchSize = batchSize;
+    }
+
+    /// <summary>
+    /// Processes a single event through all registered aggregators without batch flush bookkeeping.
+    /// </summary>
+    /// <param name="evt">Event to process.</param>
+    public void ProcessOne(in TIn evt)
+    {
+        foreach (var aggregator in _aggregators)
+            aggregator.Process(evt);
     }
 
     /// <summary>
@@ -50,8 +60,7 @@ internal sealed class EventAggregationEngine<TIn> : IDisposable
         
         foreach (ref readonly var evt in events)
         {
-            foreach (var aggregator in _aggregators)
-                aggregator.Process(evt);
+            ProcessOne(evt);
 
             batchCounter++;
 
