@@ -1,5 +1,5 @@
 using BenchmarkDotNet.Attributes;
-using ChangeTrace.Benchmarks.Core.Fixtures;
+using ChangeTrace.Benchmarks.Shared.Core;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Services;
@@ -7,9 +7,10 @@ using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
+using ChangeTrace.GIt.Services.Checkpoints.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace ChangeTrace.Benchmarks.GIt.Benchmarks;
+namespace ChangeTrace.Benchmarks.Scenario.GIt;
 
 /// <summary>
 /// Benchmarks export orchestration without clone, network, or file persistence.
@@ -25,7 +26,7 @@ public class RepositoryExporterBenchmarks
         IncludeFileChanges = true,
         IncludeBranchEvents = true,
         IncludeMergeDetection = true,
-        EnrichWithPullRequests = false
+        EnrichmentKinds = ExportEnrichmentKind.None
     };
 
     private RepositoryExporter _exporter = null!;
@@ -52,7 +53,9 @@ public class RepositoryExporterBenchmarks
             _reader,
             new TimelineBuilder(NullLogger<TimelineBuilder>.Instance),
             new NoopTimelineRepository(),
-            NullLogger<RepositoryExporter>.Instance);
+            NullLogger<RepositoryExporter>.Instance,
+            new NoOpTimelineEnricherResolver(),
+            new NoOpExportCheckpointStore());
     }
 
     [GlobalCleanup]
@@ -130,5 +133,40 @@ public class RepositoryExporterBenchmarks
             string filePath,
             CancellationToken cancellationToken = default)
             => Task.FromResult(Result<Timeline>.Failure("Not used by exporter benchmarks."));
+    }
+
+    private sealed class NoOpTimelineEnricherResolver : ITimelineEnricherResolver
+    {
+        public bool TryResolve(string provider, out ITimelineEnricher? enricher)
+        {
+            enricher = null;
+            return false;
+        }
+    }
+
+    private sealed class NoOpExportCheckpointStore : IExportCheckpointStore
+    {
+        public Task<ExportCheckpointState?> TryLoad(
+            string checkpointKey,
+            string expectedFingerprint,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<ExportCheckpointState?>(null);
+
+        public Task Save(
+            string checkpointKey,
+            ExportCheckpointState state,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task AppendPullRequestPatch(
+            string checkpointKey,
+            ExportCheckpointState state,
+            int targetIndex,
+            ChangeTrace.Core.Events.TraceEvent updatedEvent,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task Clear(string checkpointKey, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 }

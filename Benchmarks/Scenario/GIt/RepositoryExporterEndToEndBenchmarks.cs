@@ -1,6 +1,5 @@
 using BenchmarkDotNet.Attributes;
 using ChangeTrace.Core.Enums;
-using ChangeTrace.Core.Interfaces;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Results;
 using ChangeTrace.Core.Services;
@@ -8,14 +7,15 @@ using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Interfaces;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
+using ChangeTrace.GIt.Services.Checkpoints.Models;
 using ChangeTrace.GIt.Services.Sidecars;
 using Microsoft.Extensions.Logging;
 
-namespace ChangeTrace.Benchmarks.GIt.Benchmarks;
+namespace ChangeTrace.Benchmarks.Scenario.GIt;
 
 /// <summary>
 /// Benchmarks the end-to-end local export pipeline through
-/// <see cref="RepositoryExporter.ExportAndSaveAsync"/>, including:
+/// <see cref="RepositoryExporter.ExportAndSaveAsync"/>, including
 /// commit streaming, timeline build, MsgPack serialization, and file persistence.
 /// </summary>
 [MemoryDiagnoser]
@@ -44,7 +44,7 @@ public class RepositoryExporterEndToEndBenchmarks
         IncludeFileChanges = true,
         IncludeBranchEvents = true,
         IncludeMergeDetection = true,
-        EnrichWithPullRequests = false
+        EnrichmentKinds = ExportEnrichmentKind.None
     };
 
     private ILoggerFactory _loggerFactory = null!;
@@ -76,7 +76,9 @@ public class RepositoryExporterEndToEndBenchmarks
             new GeneratedGitRepositoryReader(),
             new TimelineBuilder(_loggerFactory.CreateLogger<TimelineBuilder>()),
             repository,
-            _loggerFactory.CreateLogger<RepositoryExporter>());
+            _loggerFactory.CreateLogger<RepositoryExporter>(),
+            new NoOpTimelineEnricherResolver(),
+            new NoOpExportCheckpointStore());
     }
 
     [GlobalCleanup]
@@ -229,5 +231,40 @@ public class RepositoryExporterEndToEndBenchmarks
             var patternIndex = Array.IndexOf(FilesPerCommitPattern, filesPerCommit);
             return FileChangeSets[moduleIndex, patternIndex];
         }
+    }
+
+    private sealed class NoOpTimelineEnricherResolver : ITimelineEnricherResolver
+    {
+        public bool TryResolve(string provider, out ITimelineEnricher? enricher)
+        {
+            enricher = null;
+            return false;
+        }
+    }
+
+    private sealed class NoOpExportCheckpointStore : IExportCheckpointStore
+    {
+        public Task<ExportCheckpointState?> TryLoad(
+            string checkpointKey,
+            string expectedFingerprint,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<ExportCheckpointState?>(null);
+
+        public Task Save(
+            string checkpointKey,
+            ExportCheckpointState state,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task AppendPullRequestPatch(
+            string checkpointKey,
+            ExportCheckpointState state,
+            int targetIndex,
+            ChangeTrace.Core.Events.TraceEvent updatedEvent,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task Clear(string checkpointKey, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 }

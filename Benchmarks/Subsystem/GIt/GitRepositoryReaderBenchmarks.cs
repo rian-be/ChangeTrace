@@ -1,5 +1,5 @@
 using BenchmarkDotNet.Attributes;
-using ChangeTrace.Benchmarks.GIt.Fixtures;
+using ChangeTrace.Benchmarks.Shared.GIt;
 using ChangeTrace.GIt.Options;
 using ChangeTrace.GIt.Services;
 using Microsoft.Extensions.Logging.Abstractions;
