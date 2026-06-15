@@ -51,7 +51,6 @@ internal sealed class SpeedController
     {
         Validate(initialSpeed);
         CurrentSpeed = TargetSpeed = _v0 = initialSpeed;
-        Console.WriteLine($"Speed: {CurrentSpeed}, Target: {TargetSpeed}");
     }
 
     /// <summary>
