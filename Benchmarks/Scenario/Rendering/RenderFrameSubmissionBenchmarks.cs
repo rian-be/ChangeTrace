@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Rendering;
+using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Rendering;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Scenario.Rendering;
 
 /// <summary>
 /// Benchmarks the frame submission facade used by the renderer.
@@ -13,6 +15,7 @@ namespace ChangeTrace.Benchmarks.Rendering;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Rendering)]
 public class RenderFrameSubmissionBenchmarks
 {
     private RenderBenchmarkFixture _fixture = null!;

@@ -1,6 +1,6 @@
 using LibGit2Sharp;
 
-namespace ChangeTrace.Benchmarks.GIt.Fixtures;
+namespace ChangeTrace.Benchmarks.Shared.GIt;
 
 /// <summary>
 /// Creates a local Git repository fixture for LibGit2Sharp reader benchmarks.

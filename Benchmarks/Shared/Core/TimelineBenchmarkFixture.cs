@@ -3,7 +3,7 @@ using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Core.Timelines;
 
-namespace ChangeTrace.Benchmarks.Core.Fixtures;
+namespace ChangeTrace.Benchmarks.Shared.Core;
 
 /// <summary>
 /// Shared deterministic input data for timeline, serialization, and aggregation benchmarks.

@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Rendering;
+using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Rendering.States;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Micro.Rendering;
 
 /// <summary>
 /// Benchmarks CPU-side preparation of data shaped like GPU buffer contracts.
@@ -13,6 +15,7 @@ namespace ChangeTrace.Benchmarks.Rendering;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Rendering)]
 public class GpuBufferDataPreparationBenchmarks
 {
     private RenderState _state = null!;

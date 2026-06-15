@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Shared.Player;
 
-namespace ChangeTrace.Benchmarks.Player;
+namespace ChangeTrace.Benchmarks.Subsystem.Player;
 
 /// <summary>
 /// Benchmarks creation of fully wired timeline players.
@@ -12,6 +13,7 @@ namespace ChangeTrace.Benchmarks.Player;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Player)]
 public class TimelinePlayerFactoryBenchmarks
 {
     private PlayerBenchmarkFixture _fixture = null!;

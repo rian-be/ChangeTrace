@@ -1,9 +1,11 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Rendering;
+using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Core.Events.Semantic;
 using ChangeTrace.Rendering.Commands;
 using ChangeTrace.Rendering.Translators;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Micro.Rendering;
 
 /// <summary>
 /// Benchmarks translation from semantic timeline events into render commands.
@@ -15,6 +17,7 @@ namespace ChangeTrace.Benchmarks.Rendering;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Rendering)]
 public class RenderEventTranslationBenchmarks
 {
     private TranslationPipeline _pipeline = null!;

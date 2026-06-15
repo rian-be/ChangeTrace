@@ -19,7 +19,7 @@ using ChangeTrace.Rendering.States.Edges;
 using ChangeTrace.Rendering.States.Nodes;
 using ChangeTrace.Rendering.States.Particles;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Shared.Rendering;
 
 /// <summary>
 /// Shared deterministic fixture for CPU-side rendering benchmarks.

@@ -1,7 +1,8 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Shared.Player;
 using ChangeTrace.Player.Playback;
 
-namespace ChangeTrace.Benchmarks.Player;
+namespace ChangeTrace.Benchmarks.Micro.Player;
 
 /// <summary>
 /// Benchmarks low-level timeline cursor navigation.
@@ -13,6 +14,7 @@ namespace ChangeTrace.Benchmarks.Player;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Player)]
 public class EventCursorBenchmarks
 {
     private PlayerBenchmarkFixture _fixture = null!;

@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Rendering;
+using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Rendering.Snapshots;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Subsystem.Rendering;
 
 /// <summary>
 /// Benchmarks immutable scene snapshot assembly.
@@ -13,6 +15,7 @@ namespace ChangeTrace.Benchmarks.Rendering;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Rendering)]
 public class SceneSnapshotAssemblyBenchmarks
 {
     private RenderBenchmarkFixture _fixture = null!;

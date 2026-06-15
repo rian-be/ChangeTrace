@@ -1,6 +1,8 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Rendering;
+using ChangeTrace.Benchmarks.Shared.Rendering;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Scenario.Rendering;
 
 /// <summary>
 /// Benchmarks per-frame scene simulation updates.
@@ -12,6 +14,7 @@ namespace ChangeTrace.Benchmarks.Rendering;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Rendering)]
 public class SceneFrameUpdateBenchmarks
 {
     private RenderBenchmarkFixture _fixture = null!;

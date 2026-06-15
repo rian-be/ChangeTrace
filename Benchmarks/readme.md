@@ -31,15 +31,20 @@ The benchmark suite currently covers:
 - local Git repository reading with and without file changes
 - export orchestration without clone, network, or file persistence
 - semantic render event translation from timeline events
+- render command dispatch into scene handlers
 - hive layout computation and animated convergence
+- animation system tween and particle processing
 - render state assembly from timeline events
 - scene frame update and snapshot preparation
+- player-driven render pipeline from playback tick to frame submission
 - isolated scene snapshot assembly
 - edge visibility planning through scene snapshot assembly
+- render event buffering and flush into the pipeline
+- scene graph mutation and edge-cache rebuilds
 - CPU-side GPU buffer contract preparation
 - render frame submission preparation before OpenGL upload
 
-Additional player benchmarks are available for playback cursor, seek, stepper, and player factory costs. They are kept in the same benchmark project, but the primary suite tracks issue #17 and the CPU side render pipeline.
+Additional player benchmarks are available for playback clock, cursor, seek, stepper, high-level player orchestration, and player factory costs. They are kept in the same benchmark project, but the primary suite tracks issue #17 and the CPU side render pipeline.
 
 The benchmarks intentionally avoid opening OpenTK windows or requiring GPU access. Git reader benchmarks create local synthetic repositories and do not access the network.
 
@@ -166,14 +171,17 @@ Shared deterministic setup stays under `Shared/`:
 Current type-to-domain layout:
 
 - `Micro/Core` contains normalization, aggregation, and file-coupling benchmarks
-- `Micro/Player` contains cursor, seek, and stepper benchmarks
+- `Micro/Player` contains clock, cursor, seek, and stepper benchmarks
 - `Micro/Rendering` contains render event translation, layout, and GPU buffer preparation benchmarks
+- `Micro/Rendering` also contains animation system and scene command dispatch benchmarks
 - `Subsystem/Core` contains timeline builder and serialization benchmarks
 - `Subsystem/GIt` contains Git reader benchmarks
-- `Subsystem/Player` contains player factory benchmarks
+- `Subsystem/Player` contains player orchestration and player factory benchmarks
 - `Subsystem/Rendering` contains render state and scene snapshot assembly benchmarks
+- `Subsystem/Rendering` also contains render-event buffering and scene-graph benchmarks
 - `Scenario/GIt` contains export orchestration benchmarks
 - `Scenario/Rendering` contains frame update and frame submission benchmarks
+- `Scenario/Rendering` also contains player-driven playback-to-render benchmarks
 
 The render benchmark suite maps to issue #17:
 

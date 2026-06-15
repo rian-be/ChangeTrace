@@ -2,7 +2,7 @@ using BenchmarkDotNet.Attributes;
 using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Rendering;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Scenario.Rendering;
 
 /// <summary>
 /// Benchmarks interactive rendering workflows on an already populated scene.

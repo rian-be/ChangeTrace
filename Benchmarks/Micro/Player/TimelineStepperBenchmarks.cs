@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Shared.Player;
 
-namespace ChangeTrace.Benchmarks.Player;
+namespace ChangeTrace.Benchmarks.Micro.Player;
 
 /// <summary>
 /// Benchmarks single-event stepping through a timeline.
@@ -12,6 +13,7 @@ namespace ChangeTrace.Benchmarks.Player;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Player)]
 public class TimelineStepperBenchmarks
 {
     private PlayerBenchmarkFixture _fixture = null!;

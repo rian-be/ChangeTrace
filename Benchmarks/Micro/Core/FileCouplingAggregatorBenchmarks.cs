@@ -2,7 +2,7 @@ using BenchmarkDotNet.Attributes;
 using ChangeTrace.Core.Aggregators;
 using ChangeTrace.Core.Events.Semantic;
 
-namespace ChangeTrace.Benchmarks.Core.Benchmarks;
+namespace ChangeTrace.Benchmarks.Micro.Core;
 
 /// <summary>
 /// Benchmarks file coupling pair generation from commit bundles.
