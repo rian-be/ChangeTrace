@@ -1,8 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Shared.Player;
 using ChangeTrace.Core.Models;
 using ChangeTrace.Player.Playback;
 
-namespace ChangeTrace.Benchmarks.Player;
+namespace ChangeTrace.Benchmarks.Micro.Player;
 
 /// <summary>
 /// Benchmarks player seek operations.
@@ -14,6 +15,7 @@ namespace ChangeTrace.Benchmarks.Player;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Player)]
 public class SeekableTimelineBenchmarks
 {
     private PlayerBenchmarkFixture _fixture = null!;

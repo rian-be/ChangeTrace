@@ -1,7 +1,9 @@
 using BenchmarkDotNet.Attributes;
+using ChangeTrace.Benchmarks.Rendering;
+using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Rendering.States;
 
-namespace ChangeTrace.Benchmarks.Rendering;
+namespace ChangeTrace.Benchmarks.Subsystem.Rendering;
 
 /// <summary>
 /// Benchmarks CPU-side render state assembly.
@@ -13,6 +15,7 @@ namespace ChangeTrace.Benchmarks.Rendering;
 [MemoryDiagnoser]
 [InProcess]
 [MinIterationTime(250)]
+[BenchmarkCategory(BenchmarkCategories.Rendering)]
 public class RenderStateAssemblyBenchmarks
 {
     private RenderBenchmarkFixture _fixture = null!;

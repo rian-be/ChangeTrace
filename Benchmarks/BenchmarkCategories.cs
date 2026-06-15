@@ -7,6 +7,8 @@ internal static class BenchmarkCategories
 {
     public const string Core = "Core";
     public const string Git = "Git";
+    public const string Player = "Player";
+    public const string Rendering = "Rendering";
     public const string Export = "Export";
     public const string Timeline = "Timeline";
     public const string Serialization = "Serialization";
