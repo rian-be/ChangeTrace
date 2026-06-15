@@ -1,8 +1,8 @@
 using BenchmarkDotNet.Attributes;
-using ChangeTrace.Benchmarks.Core.Fixtures;
+using ChangeTrace.Benchmarks.Shared.Core;
 using ChangeTrace.Core.Timelines;
 
-namespace ChangeTrace.Benchmarks.Core.Benchmarks;
+namespace ChangeTrace.Benchmarks.Micro.Core;
 
 /// <summary>
 /// Benchmarks timeline sorting and playback time normalization.

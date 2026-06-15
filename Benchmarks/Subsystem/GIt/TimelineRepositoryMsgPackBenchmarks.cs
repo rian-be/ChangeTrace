@@ -1,5 +1,5 @@
 using BenchmarkDotNet.Attributes;
-using ChangeTrace.Benchmarks.Core.Fixtures;
+using ChangeTrace.Benchmarks.Shared.Core;
 using ChangeTrace.Core.Services;
 using ChangeTrace.Core.Timelines;
 using ChangeTrace.GIt.Services;

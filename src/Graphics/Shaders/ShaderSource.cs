@@ -34,34 +34,54 @@ internal static class ShaderSource
     /// </summary>
     private static string FindAssetsDir()
     {
+        HashSet<string> probed =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string start in EnumerateSearchRoots())
+        {
+            string? found =
+                FindAssetsDirFrom(start, probed);
+
+            if (found is not null)
+                return found;
+        }
+
+        throw new DirectoryNotFoundException(
+            "Shader assets directory not found. Probed: " +
+            string.Join(", ", probed));
+    }
+
+    private static IEnumerable<string> EnumerateSearchRoots()
+    {
+        HashSet<string> roots =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        AddRoot(AppContext.BaseDirectory);
+        AddRoot(Environment.CurrentDirectory);
+        AddRoot(Path.GetDirectoryName(typeof(ShaderSource).Assembly.Location));
+
+        return roots;
+
+        void AddRoot(string? path)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+                roots.Add(Path.GetFullPath(path));
+        }
+    }
+
+    private static string? FindAssetsDirFrom(
+        string start,
+        ISet<string> probed)
+    {
         string current =
-            AppContext.BaseDirectory;
+            start;
 
         while (!string.IsNullOrEmpty(current))
         {
-            string[] candidates =
-            [
-                Path.Combine(
-                    current,
-                    "src",
-                    "Graphics",
-                    "Shaders",
-                    "Assets"),
-
-                Path.Combine(
-                    current,
-                    "Graphics",
-                    "Shaders",
-                    "Assets"),
-
-                Path.Combine(
-                    current,
-                    "Shaders",
-                    "Assets")
-            ];
-
-            foreach (string candidate in candidates)
+            foreach (string candidate in EnumerateCandidates(current))
             {
+                probed.Add(candidate);
+
                 if (Directory.Exists(candidate))
                     return candidate;
             }
@@ -78,7 +98,33 @@ internal static class ShaderSource
             current = parent;
         }
 
-        throw new DirectoryNotFoundException(
-            "Shader assets directory not found.");
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateCandidates(
+        string current)
+    {
+        yield return Path.Combine(
+            current,
+            "src",
+            "Graphics",
+            "Shaders",
+            "Assets");
+
+        yield return Path.Combine(
+            current,
+            "Graphics",
+            "Shaders",
+            "Assets");
+
+        yield return Path.Combine(
+            current,
+            "Shaders",
+            "Assets");
+
+        yield return Path.Combine(
+            current,
+            "Assets",
+            "Shaders");
     }
 }

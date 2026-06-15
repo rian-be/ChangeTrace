@@ -1,11 +1,11 @@
 using BenchmarkDotNet.Attributes;
-using ChangeTrace.Benchmarks.Core.Fixtures;
+using ChangeTrace.Benchmarks.Shared.Core;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Events.Semantic;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Processors;
 
-namespace ChangeTrace.Benchmarks.Core.Benchmarks;
+namespace ChangeTrace.Benchmarks.Micro.Core;
 
 /// <summary>
 /// Benchmarks semantic aggregation from raw trace events.
