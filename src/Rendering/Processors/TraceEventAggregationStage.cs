@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using ChangeTrace.Core.Aggregators;
 using ChangeTrace.Core.Events;
 using ChangeTrace.Core.Events.Semantic;
@@ -31,8 +29,7 @@ internal sealed class TraceEventAggregationStage : IDisposable
     private readonly List<IEventAggregator<CommitBundleEvent>> _commitAggregators = new();
 
     private readonly SemanticEventWriter<CommitBundleEvent>? _commitWriter;
-
-    private int _commitCursor;
+    private readonly MergeMetadataAggregator? _mergeMetadata;
 
     /// <summary>
     /// Initializes the aggregation stage based on enabled rendering event kinds.
@@ -42,18 +39,28 @@ internal sealed class TraceEventAggregationStage : IDisposable
     {
         // TRACE aggregators
 
-        if (enabledEvents.HasFlag(RenderEventKinds.Commit) ||
-            enabledEvents.HasFlag(RenderEventKinds.FileCoupling))
+        var needsCommitBundles =
+            enabledEvents.HasFlag(RenderEventKinds.Commit) ||
+            enabledEvents.HasFlag(RenderEventKinds.FileCoupling) ||
+            enabledEvents.HasFlag(RenderEventKinds.Merge);
+
+        if (needsCommitBundles)
         {
             _commitWriter = CreateWriter<CommitBundleEvent>();
-            RegisterTrace(new CommitBundlingAggregator(_commitWriter));
+            RegisterTrace(new CommitBundlingAggregator(
+                _commitWriter,
+                onEmit: ForwardCommitBundle));
         }
 
         if (enabledEvents.HasFlag(RenderEventKinds.Branch))
             RegisterTrace(new BranchAggregator(CreateWriter<BranchEvent>()));
 
         if (enabledEvents.HasFlag(RenderEventKinds.Merge))
-            RegisterTrace(new MergeAggregator(CreateWriter<MergeEvent>()));
+        {
+            _mergeMetadata = new MergeMetadataAggregator();
+            RegisterTrace(_mergeMetadata);
+            RegisterCommit(new MergeCommitAggregator(CreateWriter<MergeEvent>(), _mergeMetadata));
+        }
 
         if (enabledEvents.HasFlag(RenderEventKinds.PullRequest))
             RegisterTrace(new PullRequestAggregator(CreateWriter<PullRequestEvent>()));
@@ -102,26 +109,7 @@ internal sealed class TraceEventAggregationStage : IDisposable
     /// </summary>
     public void Process(in TraceEvent evt)
     {
-        _engine.Process(
-            MemoryMarshal.CreateReadOnlySpan(
-                ref Unsafe.AsRef(in evt), 1));
-        
-        if (_commitEngine == null || _commitWriter == null)
-            return;
-
-        var snapshot = _commitWriter.Snapshot();
-        var span = snapshot.Span;
-        
-        for (var i = _commitCursor; i < span.Length; i++)
-        {
-            ref readonly var commitBundle = ref span[i];
-
-            _commitEngine.Process(
-                MemoryMarshal.CreateReadOnlySpan(
-                    ref Unsafe.AsRef(in commitBundle), 1));
-        }
-
-        _commitCursor = span.Length;
+        _engine.ProcessOne(evt);
     }
 
     /// <summary>
@@ -143,7 +131,7 @@ internal sealed class TraceEventAggregationStage : IDisposable
             ((ISemanticEventWriter)writer).Clear();
         }
 
-        _commitCursor = 0;
+        _mergeMetadata?.Clear();
     }
 
     /// <summary>
@@ -154,4 +142,7 @@ internal sealed class TraceEventAggregationStage : IDisposable
         _engine.Dispose();
         _commitEngine?.Dispose();
     }
+
+    private void ForwardCommitBundle(CommitBundleEvent bundle)
+        => _commitEngine?.ProcessOne(bundle);
 }

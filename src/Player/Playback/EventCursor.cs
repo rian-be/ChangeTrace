@@ -27,6 +27,9 @@ internal sealed class EventCursor : IEventCursor
     /// <summary>Event at current cursor position (clamped to bounds), or null if empty.</summary>
     public TraceEvent? CurrentEvent => _events.Count > 0 ? _events[Math.Clamp(Index, 0, _events.Count - 1)] : null;
 
+    /// <summary>Gets event at a specific timeline index.</summary>
+    public TraceEvent GetEventAt(int index) => _events[index];
+
     /// <summary>First event in the timeline, or null if empty.</summary>
     public TraceEvent? FirstEvent => _events.Count > 0 ? _events[0] : null;
     
@@ -67,19 +70,49 @@ internal sealed class EventCursor : IEventCursor
     /// <summary>Drains and returns all events up to <paramref name="virtualNow"/> while advancing cursor.</summary>
     public IReadOnlyList<TraceEvent> DrainForward(double virtualNow)
     {
-        var batch = new List<TraceEvent>();
-        while (Index < _events.Count && TimeOf(Index) <= virtualNow)
-            batch.Add(_events[Index++]);
+        var (startIndex, count) = DrainForwardRange(virtualNow);
+        if (count == 0)
+            return [];
+
+        var batch = new List<TraceEvent>(count);
+        for (var i = 0; i < count; i++)
+            batch.Add(_events[startIndex + i]);
+
         return batch;
+    }
+
+    /// <summary>Drains forward and returns the drained range without allocating a batch list.</summary>
+    public (int StartIndex, int Count) DrainForwardRange(double virtualNow)
+    {
+        var startIndex = Index;
+        while (Index < _events.Count && _events[Index].TimeForPlayback <= virtualNow)
+            Index++;
+
+        return (startIndex, Index - startIndex);
     }
 
     /// <summary>Drains and returns all events from current cursor down to <paramref name="virtualNow"/> while retreating cursor.</summary>
     public IReadOnlyList<TraceEvent> DrainBackward(double virtualNow)
     {
-        var batch = new List<TraceEvent>();
-        while (Index >= 0 && TimeOf(Index) >= virtualNow)
-            batch.Add(_events[Index--]);
+        var (startIndex, count) = DrainBackwardRange(virtualNow);
+        if (count == 0)
+            return [];
+
+        var batch = new List<TraceEvent>(count);
+        for (var i = 0; i < count; i++)
+            batch.Add(_events[startIndex - i]);
+
         return batch;
+    }
+
+    /// <summary>Drains backward and returns the drained range without allocating a batch list.</summary>
+    public (int StartIndex, int Count) DrainBackwardRange(double virtualNow)
+    {
+        var startIndex = Index;
+        while (Index >= 0 && _events[Index].TimeForPlayback >= virtualNow)
+            Index--;
+
+        return (startIndex, startIndex - Index);
     }
 
     /// <summary>Steps cursor forward by one event.</summary>
@@ -100,15 +133,6 @@ internal sealed class EventCursor : IEventCursor
         return (evt, true);
     }
 
-    /// <summary>Gets timestamp of event at given index, or <c>double.MaxValue</c> if out of range.</summary>
-    private double TimeOf(int idx)
-    {
-        if (idx < 0 || idx >= _events.Count)
-            return double.MaxValue;
-
-        return _events[idx].TimeForPlayback;
-    }
-    
     /// <summary>Binary search for first event at or after target timestamp.</summary>
     private int BinarySearch(double target)
     {
@@ -116,7 +140,7 @@ internal sealed class EventCursor : IEventCursor
         while (lo <= hi)
         {
             int mid = (lo + hi) >> 1;
-            if (TimeOf(mid) >= target)
+            if (_events[mid].TimeForPlayback >= target)
             {
                 result = mid;
                 hi = mid - 1;

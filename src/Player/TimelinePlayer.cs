@@ -179,7 +179,10 @@ internal sealed class TimelinePlayer : ITimelinePlayer
     /// </summary>
     private void OnTransportTick()
     {
-        IReadOnlyList<TraceEvent>? batch;
+        Action<TraceEvent>? onEvent;
+        int batchStartIndex = 0;
+        int batchCount = 0;
+        bool batchBackward = false;
         bool loopFired = false;
 
         lock (_lock)
@@ -188,13 +191,20 @@ internal sealed class TimelinePlayer : ITimelinePlayer
                 return;
 
             double virtualNow = _clock.VirtualNow;
+            onEvent = OnEvent;
 
-            batch = _direction == PlaybackDirection.Forward
-                ? _cursor.DrainForward(virtualNow)
-                : _cursor.DrainBackward(virtualNow);
+            if (_direction == PlaybackDirection.Forward)
+            {
+                (batchStartIndex, batchCount) = _cursor.DrainForwardRange(virtualNow);
+            }
+            else
+            {
+                (batchStartIndex, batchCount) = _cursor.DrainBackwardRange(virtualNow);
+                batchBackward = true;
+            }
 
-            _eventsFired += batch.Count;
-            _totalEventsAcrossTicks += batch.Count;
+            _eventsFired += batchCount;
+            _totalEventsAcrossTicks += batchCount;
 
             bool boundary = _direction == PlaybackDirection.Forward
                 ? _cursor.AtEnd
@@ -224,8 +234,19 @@ internal sealed class TimelinePlayer : ITimelinePlayer
             }
         }
 
-        foreach (var evt in batch)
-            OnEvent?.Invoke(evt);
+        if (onEvent != null && batchCount > 0)
+        {
+            if (!batchBackward)
+            {
+                for (var i = 0; i < batchCount; i++)
+                    onEvent(_cursor.GetEventAt(batchStartIndex + i));
+            }
+            else
+            {
+                for (var i = 0; i < batchCount; i++)
+                    onEvent(_cursor.GetEventAt(batchStartIndex - i));
+            }
+        }
 
         OnProgress?.Invoke(Progress);
 
