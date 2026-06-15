@@ -6,3 +6,6 @@ nupkg/
 .obsidian/
 BenchmarkDotNet.Artifacts/
 .env
+ChangeTrace.gittrace.parts/
+ChangeTrace.gittrace.debug.json
+ChangeTrace.gittrace
