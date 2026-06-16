@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Numerics;
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Scene;
@@ -13,56 +14,68 @@ internal sealed class NodeSnapshotAssembler
     /// <summary>
     /// Converts live scene nodes into render snapshots.
     /// </summary>
-    public List<NodeSnapshot> Assemble(
+    public IReadOnlyList<NodeSnapshot> Assemble(
         IReadOnlyDictionary<string, SceneNode> nodes)
     {
         var nodeCount = nodes.Count;
-
         var nodeDensityScale =
             MathF.Max(
                 0.45f,
                 1.0f - nodeCount / 8000f);
 
         var nodesArray =
-            nodes.Values.ToArray();
+            ArrayPool<SceneNode>.Shared.Rent(nodeCount);
+
+        var copied = 0;
+        foreach (var node in nodes.Values)
+            nodesArray[copied++] = node;
 
         var snapshots =
-            new NodeSnapshot[nodesArray.Length];
+            new NodeSnapshot[nodeCount];
 
-        Parallel.For(
-            0,
-            nodesArray.Length,
-            i =>
-            {
-                var node = nodesArray[i];
+        try
+        {
+            Parallel.For(
+                0,
+                nodeCount,
+                i =>
+                {
+                    var node = nodesArray[i];
 
-                var style =
-                    NodeSnapshotStyle.FromNode(
-                        node,
-                        nodeCount,
-                        nodeDensityScale);
+                    var style =
+                        NodeSnapshotStyle.FromNode(
+                            node,
+                            nodeCount,
+                            nodeDensityScale);
 
-                var parentId =
-                    node.Kind == NodeKind.Root
-                        ? null
-                        : string.IsNullOrWhiteSpace(node.ParentId)
-                            ? SceneIds.Root
-                            : node.ParentId;
+                    var parentId =
+                        node.Kind == NodeKind.Root
+                            ? null
+                            : string.IsNullOrWhiteSpace(node.ParentId)
+                                ? SceneIds.Root
+                                : node.ParentId;
 
-                snapshots[i] =
-                    new NodeSnapshot(
-                        node.Id,
-                        node.Position,
-                        style.Radius,
-                        style.Color,
-                        style.Glow,
-                        node.Flyweight,
-                        node.Label,
-                        node.IsParent,
-                        parentId);
-            });
+                    snapshots[i] =
+                        new NodeSnapshot(
+                            node.Id,
+                            node.Position,
+                            style.Radius,
+                            style.Color,
+                            style.Glow,
+                            node.Kind,
+                            node.Label,
+                            node.IsParent,
+                            parentId);
+                });
+        }
+        finally
+        {
+            ArrayPool<SceneNode>.Shared.Return(
+                nodesArray,
+                clearArray: true);
+        }
 
-        return [..snapshots];
+        return snapshots;
     }
 
     /// <summary>
