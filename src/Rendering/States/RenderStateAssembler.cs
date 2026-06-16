@@ -29,6 +29,9 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
     private readonly LeaderboardAssembler _leaderboard = new();
     private readonly HudStateAssembler _hud = new();
 
+    private ISceneSnapshot _cachedSceneSnapshot = SceneSnapshot.Empty;
+    private bool _hasCachedSceneSnapshot;
+
     /// <summary>
     /// Records contributor activity for leaderboard tracking.
     /// </summary>
@@ -39,7 +42,15 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
     /// Clears accumulated render-related state.
     /// </summary>
     public void Reset() =>
+        ResetCaches();
+
+    private void ResetCaches()
+    {
         _leaderboard.Reset();
+        _extensions.Reset();
+        _cachedSceneSnapshot = SceneSnapshot.Empty;
+        _hasCachedSceneSnapshot = false;
+    }
 
     private static Dictionary<string, int> BuildNodeIndex(
         IReadOnlyList<NodeSnapshot> nodes)
@@ -65,14 +76,15 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
         PlayerDiagnostics diagnostics,
         SceneNode? hoveredNode,
         HoveredPodHud? hoveredPod,
-        LayoutMode layoutMode)
+        LayoutMode layoutMode,
+        bool sceneUnchanged = false)
     {
-        var nodeSnapshots = _nodes.Assemble(scene.Nodes);
-        var nodeIndex = BuildNodeIndex(nodeSnapshots);
-        var avatarSnapshots = _avatars.Assemble(scene.Avatars, out var activeAvatarsCount);
-        var edgeSnapshots = _edges.Assemble(scene, nodeIndex);
-        var particleSnapshots = _particles.Assemble(animationSystem);
-        var extensions = _extensions.Assemble(scene);
+        int activeAvatarsCount =
+            scene.Avatars.Count(static avatar => avatar.Value.ActivityLevel > 0.1f);
+
+        var extensions = _extensions.Assemble(
+            scene,
+            sceneUnchanged);
         var leaderboard = _leaderboard.Assemble();
 
         var hudState =
@@ -88,11 +100,10 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
                 leaderboard);
 
         var sceneSnapshot =
-            SceneSnapshotMaterializer.Create(
-                nodeSnapshots,
-                avatarSnapshots,
-                edgeSnapshots,
-                particleSnapshots);
+            GetOrCreateSceneSnapshot(
+                scene,
+                animationSystem,
+                sceneUnchanged);
 
         return new RenderState(
             virtualTime,
@@ -102,5 +113,30 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
             hudState,
             layoutMode,
             diagnostics.ManagedMemoryMb);
+    }
+
+    private ISceneSnapshot GetOrCreateSceneSnapshot(
+        ISceneGraph scene,
+        IAnimationSystem animationSystem,
+        bool sceneUnchanged)
+    {
+        if (sceneUnchanged && _hasCachedSceneSnapshot)
+            return _cachedSceneSnapshot;
+
+        var nodeSnapshots = _nodes.Assemble(scene.Nodes);
+        var nodeIndex = BuildNodeIndex(nodeSnapshots);
+        var avatarSnapshots = _avatars.Assemble(scene.Avatars, out _);
+        var edgeSnapshots = _edges.Assemble(scene, nodeIndex);
+        var particleSnapshots = _particles.Assemble(animationSystem);
+
+        _cachedSceneSnapshot =
+            SceneSnapshotMaterializer.Create(
+                nodeSnapshots,
+                avatarSnapshots,
+                edgeSnapshots,
+                particleSnapshots);
+
+        _hasCachedSceneSnapshot = true;
+        return _cachedSceneSnapshot;
     }
 }

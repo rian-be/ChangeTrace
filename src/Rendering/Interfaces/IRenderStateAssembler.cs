@@ -30,7 +30,8 @@ internal interface IRenderStateAssembler
         PlayerDiagnostics diagnostics,
         SceneNode? hoveredNode,
         HoveredPodHud? hoveredPod,
-        LayoutMode mode);
+        LayoutMode mode,
+        bool sceneUnchanged = false);
 
     /// <summary>
     /// Clears accumulated internal state.

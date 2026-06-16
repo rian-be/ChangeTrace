@@ -9,11 +9,18 @@ namespace ChangeTrace.Rendering.States.Hud;
 /// </summary>
 internal sealed class ExtensionStatisticsAssembler
 {
+    private IReadOnlyList<ExtensionStat> _cached = [];
+
     /// <summary>
     /// Collects and ranks the most common file extensions in the scene.
     /// </summary>
-    public IReadOnlyList<ExtensionStat> Assemble(ISceneGraph scene)
+    public IReadOnlyList<ExtensionStat> Assemble(
+        ISceneGraph scene,
+        bool sceneUnchanged)
     {
+        if (sceneUnchanged)
+            return _cached;
+
         var counts = new Dictionary<string, int>();
 
         foreach (var node in scene.Nodes.Values)
@@ -28,10 +35,15 @@ internal sealed class ExtensionStatisticsAssembler
                 counts.GetValueOrDefault(node.Extension) + 1;
         }
 
-        return counts
+        _cached = counts
             .OrderByDescending(x => x.Value)
             .Take(8)
             .Select(x => new ExtensionStat(x.Key, x.Value))
             .ToList();
+
+        return _cached;
     }
+
+    public void Reset() =>
+        _cached = [];
 }
