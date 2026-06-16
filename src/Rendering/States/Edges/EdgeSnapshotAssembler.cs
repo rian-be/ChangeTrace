@@ -16,20 +16,20 @@ internal sealed class EdgeSnapshotAssembler
     /// <summary>
     /// Converts visible scene edges into immutable render snapshots.
     /// </summary>
-    public List<EdgeSnapshot> Assemble(
-        ISceneGraph scene)
+    public IReadOnlyList<EdgeSnapshotIndexed> Assemble(
+        ISceneGraph scene,
+        IReadOnlyDictionary<string, int> nodeIndex)
     {
-        var snapshots =
-            new List<EdgeSnapshot>(
-                scene.Edges.Count);
+        var sceneNodes = scene.Nodes;
+        var edges = scene.Edges;
+        var snapshots = new EdgeSnapshotIndexed[edges.Count];
+        var snapshotCount = 0;
+        var fileChildrenByParent = _visibilityFilter.CountFileChildrenByParent(sceneNodes);
 
-        var fileChildrenByParent =
-            _visibilityFilter.CountFileChildrenByParent(scene);
-
-        foreach (var edge in scene.Edges)
+        foreach (var edge in edges)
         {
             if (!TryResolveHierarchyEdge(
-                    scene,
+                    sceneNodes,
                     edge,
                     out var fromNode,
                     out var toNode))
@@ -51,25 +51,36 @@ internal sealed class EdgeSnapshotAssembler
                     fromNode,
                     toNode);
 
-            snapshots.Add(
-                new EdgeSnapshot(
-                    edge.FromId,
-                    edge.ToId,
+            if (!nodeIndex.TryGetValue(edge.FromId, out var fromIndex) ||
+                !nodeIndex.TryGetValue(edge.ToId, out var toIndex))
+            {
+                continue;
+            }
+
+            snapshots[snapshotCount++] =
+                new EdgeSnapshotIndexed(
+                    fromIndex,
+                    toIndex,
                     edge.Kind,
                     style.Alpha,
                     edge.Color,
                     style.ThicknessStart,
-                    style.ThicknessEnd));
+                    style.ThicknessEnd);
         }
 
-        return snapshots;
+        if (snapshotCount == snapshots.Length)
+            return snapshots;
+
+        var trimmed = new EdgeSnapshotIndexed[snapshotCount];
+        Array.Copy(snapshots, trimmed, snapshotCount);
+        return trimmed;
     }
 
     /// <summary>
     /// Resolves hierarchy edge endpoints from the scene graph.
     /// </summary>
     private static bool TryResolveHierarchyEdge(
-        ISceneGraph scene,
+        IReadOnlyDictionary<string, SceneNode> nodes,
         SceneEdge edge,
         out SceneNode fromNode,
         out SceneNode toNode)
@@ -80,16 +91,10 @@ internal sealed class EdgeSnapshotAssembler
         if (edge.Kind != EdgeKind.Hierarchy)
             return false;
 
-        var resolvedFrom =
-            scene.FindNode(edge.FromId);
-
-        if (resolvedFrom is null)
+        if (!nodes.TryGetValue(edge.FromId, out var resolvedFrom))
             return false;
 
-        var resolvedTo =
-            scene.FindNode(edge.ToId);
-
-        if (resolvedTo is null)
+        if (!nodes.TryGetValue(edge.ToId, out var resolvedTo))
             return false;
 
         fromNode = resolvedFrom;

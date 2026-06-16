@@ -65,20 +65,22 @@ internal readonly record struct GpuBufferData(
         for (var i = 0; i < edges.Count; i++)
         {
             var edge = edges[i];
-            var from = state.Scene.FindNode(edge.FromId);
-            var to = state.Scene.FindNode(edge.ToId);
+            var hasFrom = edge.FromIndex >= 0 && edge.FromIndex < nodes.Count;
+            var hasTo = edge.ToIndex >= 0 && edge.ToIndex < nodes.Count;
+            var from = hasFrom ? nodes[edge.FromIndex] : default;
+            var to = hasTo ? nodes[edge.ToIndex] : default;
 
             gpuEdges[i] = new GpuEdge
             {
-                From = from is null ? Vector2.Zero : ToVector2(from.Value.Position),
-                To = to is null ? Vector2.Zero : ToVector2(to.Value.Position),
+                From = hasFrom ? ToVector2(from.Position) : Vector2.Zero,
+                To = hasTo ? ToVector2(to.Position) : Vector2.Zero,
                 Color = edge.Color,
                 Alpha = edge.Alpha,
                 WidthStart = edge.WidthStart,
                 WidthEnd = edge.WidthEnd,
                 Kind = (float)edge.Kind,
-                FromGlow = from?.Glow ?? 0.0f,
-                ToGlow = to?.Glow ?? 0.0f
+                FromGlow = hasFrom ? from.Glow : 0.0f,
+                ToGlow = hasTo ? to.Glow : 0.0f
             };
         }
 

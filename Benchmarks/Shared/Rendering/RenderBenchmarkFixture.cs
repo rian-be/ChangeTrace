@@ -150,8 +150,9 @@ internal sealed class RenderBenchmarkFixture
     public SceneSnapshot AssembleSceneSnapshot()
     {
         var nodes = _nodeSnapshots.Assemble(Scene.Nodes);
+        var nodeIndex = BuildNodeIndex(nodes);
         var avatars = _avatarSnapshots.Assemble(Scene.Avatars, out _);
-        var edges = _edgeSnapshots.Assemble(Scene);
+        var edges = _edgeSnapshots.Assemble(Scene, nodeIndex);
         var particles = _particleSnapshots.Assemble(Animation);
 
         return new SceneSnapshot(nodes, avatars, edges, particles);
@@ -227,6 +228,17 @@ internal sealed class RenderBenchmarkFixture
         public void Submit(RenderState state)
         {
         }
+    }
+
+    private static Dictionary<string, int> BuildNodeIndex(
+        IReadOnlyList<NodeSnapshot> nodes)
+    {
+        var nodeIndex = new Dictionary<string, int>(nodes.Count);
+
+        for (var i = 0; i < nodes.Count; i++)
+            nodeIndex[nodes[i].Id] = i;
+
+        return nodeIndex;
     }
 
     private sealed class NoopLayoutEngine : ILayoutEngine

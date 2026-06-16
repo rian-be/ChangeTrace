@@ -76,7 +76,7 @@ internal sealed class EdgeGpuPipeline
     /// Uploads edges into GPU storage.
     /// </summary>
     public int UploadEdges(
-        IReadOnlyList<EdgeSnapshot> edges,
+        IReadOnlyList<EdgeSnapshotIndexed> edges,
         ISceneSnapshot scene,
         float zoom)
     {
@@ -92,22 +92,21 @@ internal sealed class EdgeGpuPipeline
                 zoom,
                 MinZoom);
 
-        foreach (EdgeSnapshot edge in edges)
+        foreach (EdgeSnapshotIndexed edge in edges)
         {
             if (written >= maxCount)
                 break;
 
-            NodeSnapshot? from =
-                scene.FindNode(edge.FromId);
-
-            NodeSnapshot? to =
-                scene.FindNode(edge.ToId);
-
-            if (from == null || to == null)
+            if (edge.FromIndex < 0 ||
+                edge.ToIndex < 0 ||
+                edge.FromIndex >= scene.Nodes.Count ||
+                edge.ToIndex >= scene.Nodes.Count)
+            {
                 continue;
+            }
 
-            NodeSnapshot fromNode = from.Value;
-            NodeSnapshot toNode = to.Value;
+            NodeSnapshot fromNode = scene.Nodes[edge.FromIndex];
+            NodeSnapshot toNode = scene.Nodes[edge.ToIndex];
 
             Vector2 fromPos = new(
                 fromNode.Position.X,

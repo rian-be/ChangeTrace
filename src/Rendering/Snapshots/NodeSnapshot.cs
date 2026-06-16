@@ -17,11 +17,8 @@ internal readonly record struct NodeSnapshot(
     float Radius,
     Vector4 Color,
     float Glow,
-    NodeFlyweight Flyweight,
+    NodeKind Kind,
     string Label,
     bool IsParent,
     string? ParentId = null
-)
-{
-    public NodeKind Kind => Flyweight.Kind;
-}
+);

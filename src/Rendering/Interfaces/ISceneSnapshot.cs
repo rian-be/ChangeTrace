@@ -21,7 +21,7 @@ internal interface ISceneSnapshot
     /// <summary>
     /// Snapshot edges.
     /// </summary>
-    IReadOnlyList<EdgeSnapshot> Edges { get; }
+    IReadOnlyList<EdgeSnapshotIndexed> Edges { get; }
 
     /// <summary>
     /// Snapshot particles.
@@ -61,22 +61,22 @@ internal interface ISceneSnapshot
     /// <summary>
     /// Returns edges originating from the node.
     /// </summary>
-    IEnumerable<EdgeSnapshot> EdgesFrom(string nodeId);
+    IEnumerable<EdgeSnapshotIndexed> EdgesFrom(string nodeId);
 
     /// <summary>
     /// Returns edges targeting the node.
     /// </summary>
-    IEnumerable<EdgeSnapshot> EdgesTo(string nodeId);
+    IEnumerable<EdgeSnapshotIndexed> EdgesTo(string nodeId);
 
     /// <summary>
     /// Returns edges matching the specified kind.
     /// </summary>
-    IEnumerable<EdgeSnapshot> EdgesOfKind(EdgeKind kind);
+    IEnumerable<EdgeSnapshotIndexed> EdgesOfKind(EdgeKind kind);
 
     /// <summary>
     /// Returns visible edges above an alpha threshold.
     /// </summary>
-    IEnumerable<EdgeSnapshot> VisibleEdges(float alphaThreshold = 0.02f);
+    IEnumerable<EdgeSnapshotIndexed> VisibleEdges(float alphaThreshold = 0.02f);
 
     /// <summary>
     /// Computes center position of all nodes.
