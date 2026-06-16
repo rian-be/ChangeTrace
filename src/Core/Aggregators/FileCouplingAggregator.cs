@@ -1,5 +1,6 @@
 using ChangeTrace.Core.Events.Semantic;
 using ChangeTrace.Core.Interfaces;
+using ChangeTrace.Core.Options;
 
 namespace ChangeTrace.Core.Aggregators;
 
@@ -17,9 +18,14 @@ namespace ChangeTrace.Core.Aggregators;
 /// architectural coupling between files in repository over time.
 /// </para>
 /// </remarks>
-internal sealed class FileCouplingAggregator(SemanticEventWriter<FileCouplingEvent> writer)
+internal sealed class FileCouplingAggregator(
+    SemanticEventWriter<FileCouplingEvent> writer,
+    FileCouplingAggregatorOptions? options = null)
     : IEventAggregator<CommitBundleEvent>
 {
+    private readonly FileCouplingAggregatorOptions _options =
+        options ?? new FileCouplingAggregatorOptions();
+
     /// <summary>
     /// Processes single <see cref="CommitBundleEvent"/> and emits
     /// <see cref="FileCouplingEvent"/> for all file pairs modified together.
@@ -44,7 +50,12 @@ internal sealed class FileCouplingAggregator(SemanticEventWriter<FileCouplingEve
         if (files.Length < 2)
             return;
 
+        if (files.Length > _options.MaxFilesPerCommit)
+            return;
+
         var timestamp = bundle.Timestamp;
+        var pairCount = files.Length * (files.Length - 1) / 2;
+        writer.EnsureAdditionalCapacity(pairCount);
 
         for (var i = 0; i < files.Length; i++)
         {
