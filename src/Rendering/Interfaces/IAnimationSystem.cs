@@ -1,5 +1,6 @@
 using System.Numerics;
 using ChangeTrace.Rendering.Animation;
+using ChangeTrace.Rendering.Snapshots;
 
 namespace ChangeTrace.Rendering.Interfaces;
 
@@ -12,7 +13,7 @@ internal interface IAnimationSystem
     /// <summary>
     /// Snapshots all active particles into the provided list without allocation.
     /// </summary>
-    void SnapshotParticles(List<Snapshots.ParticleSnapshot> target);
+    void SnapshotParticles(List<ParticleSnapshot> target);
 
     /// <summary>
     /// Gets the number of active particles.

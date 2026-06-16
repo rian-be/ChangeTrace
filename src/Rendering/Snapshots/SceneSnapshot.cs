@@ -14,63 +14,27 @@ internal sealed class SceneSnapshot : ISceneSnapshot
     /// <summary>
     /// Fast node lookup index.
     /// </summary>
-    private readonly Dictionary<string, NodeSnapshot> _nodeIndex;
     private readonly Dictionary<string, int> _nodePositionIndex;
 
     internal SceneSnapshot(
         IReadOnlyList<NodeSnapshot> nodes,
         IReadOnlyList<AvatarSnapshot> avatars,
         IReadOnlyList<EdgeSnapshotIndexed> edges,
-        IReadOnlyList<ParticleSnapshot> particles)
+        IReadOnlyList<ParticleSnapshot> particles,
+        Dictionary<string, int> nodePositionIndex)
     {
-        _nodeIndex =
-            new Dictionary<string, NodeSnapshot>(
-                nodes.Count);
-        _nodePositionIndex =
-            new Dictionary<string, int>(
-                nodes.Count);
-
-        foreach (NodeSnapshot node in nodes)
-            _nodeIndex[node.Id] = node;
-
-        Nodes =
-            _nodeIndex.Values
-                .OrderBy(n => n.Kind switch
-                {
-                    NodeKind.Root => 0,
-                    NodeKind.Branch => 1,
-                    NodeKind.File => 2,
-                    _ => 1
-                })
-                .ThenBy(n => n.Id)
-                .ToArray();
-
-        for (var i = 0; i < Nodes.Count; i++)
-            _nodePositionIndex[Nodes[i].Id] = i;
-
-        Avatars =
-            avatars;
-
-        Edges =
-            edges
-                .Where(e =>
-                    e.FromIndex >= 0 &&
-                    e.ToIndex >= 0 &&
-                    e.FromIndex < Nodes.Count &&
-                    e.ToIndex < Nodes.Count)
-                .DistinctBy(e =>
-                    (e.FromIndex, e.ToIndex, e.Kind))
-                .ToArray();
-
-        Particles =
-            particles;
+        Nodes = nodes;
+        Avatars = avatars;
+        Edges = edges;
+        Particles = particles;
+        _nodePositionIndex = nodePositionIndex;
     }
 
     /// <summary>
     /// Empty reusable scene snapshot.
     /// </summary>
     internal static SceneSnapshot Empty { get; } =
-        new([], [], [], []);
+        new([], [], [], [], new Dictionary<string, int>());
 
     /// <summary>
     /// Scene nodes.
@@ -145,7 +109,9 @@ internal sealed class SceneSnapshot : ISceneSnapshot
         if (string.IsNullOrWhiteSpace(id))
             return null;
 
-        return _nodeIndex.GetValueOrDefault(id);
+        return _nodePositionIndex.TryGetValue(id, out var index)
+            ? Nodes[index]
+            : null;
     }
 
     /// <summary>
@@ -157,22 +123,19 @@ internal sealed class SceneSnapshot : ISceneSnapshot
     /// <summary>
     /// Returns glowing nodes above a threshold.
     /// </summary>
-    public IEnumerable<NodeSnapshot> GlowingNodes(
-        float threshold = 0.05f) =>
+    public IEnumerable<NodeSnapshot> GlowingNodes(float threshold = 0.05f) =>
         Nodes.Where(n => n.Glow > threshold);
 
     /// <summary>
     /// Returns active avatars above an activity threshold.
     /// </summary>
-    public IEnumerable<AvatarSnapshot> ActiveAvatars(
-        float activityThreshold = 0.1f) =>
+    public IEnumerable<AvatarSnapshot> ActiveAvatars(float activityThreshold = 0.1f) =>
         Avatars.Where(a => a.ActivityLevel > activityThreshold);
 
     /// <summary>
     /// Returns visible avatars above an alpha threshold.
     /// </summary>
-    public IEnumerable<AvatarSnapshot> VisibleAvatars(
-        float alphaThreshold = 0.05f) =>
+    public IEnumerable<AvatarSnapshot> VisibleAvatars(float alphaThreshold = 0.05f) =>
         Avatars.Where(a =>
             a.Alpha * a.ActivityLevel > alphaThreshold);
 
@@ -213,8 +176,7 @@ internal sealed class SceneSnapshot : ISceneSnapshot
     /// <summary>
     /// Returns visible edges above an alpha threshold.
     /// </summary>
-    public IEnumerable<EdgeSnapshotIndexed> VisibleEdges(
-        float alphaThreshold = 0.02f) =>
+    public IEnumerable<EdgeSnapshotIndexed> VisibleEdges(float alphaThreshold = 0.02f) =>
         Edges.Where(e => e.Alpha > alphaThreshold);
 
     /// <summary>
@@ -225,9 +187,7 @@ internal sealed class SceneSnapshot : ISceneSnapshot
         if (Nodes.Count == 0)
             return null;
 
-        Vec2 sum =
-            Vec2.Zero;
-
+        Vec2 sum = Vec2.Zero;
         foreach (NodeSnapshot node in Nodes)
             sum += node.Position;
 
@@ -245,13 +205,11 @@ internal sealed class SceneSnapshot : ISceneSnapshot
         NodeSnapshot? best =
             null;
 
-        float bestDist =
-            float.MaxValue;
+        float bestDist = float.MaxValue;
 
         foreach (NodeSnapshot node in Nodes)
         {
-            float dist =
-                (node.Position - point).LengthSq;
+            float dist = (node.Position - point).LengthSq;
 
             if (!(dist < bestDist))
                 continue;
@@ -278,4 +236,5 @@ internal sealed class SceneSnapshot : ISceneSnapshot
                 Nodes.Count(n => n.Glow > 0.05f),
             VisibleEdges:
                 Edges.Count(e => e.Alpha > 0.02f));
+
 }

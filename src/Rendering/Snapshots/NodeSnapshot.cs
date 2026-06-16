@@ -1,6 +1,5 @@
 using System.Numerics;
 using ChangeTrace.Rendering.Enums;
-using ChangeTrace.Rendering.Scene;
 
 namespace ChangeTrace.Rendering.Snapshots;
 
