@@ -1,6 +1,7 @@
 using ChangeTrace.Rendering.Enums;
 using ChangeTrace.Rendering.Snapshots;
 using ChangeTrace.Rendering.States;
+using System.Linq;
 
 namespace ChangeTrace.Graphics.Rendering.Scene;
 
@@ -9,23 +10,25 @@ namespace ChangeTrace.Graphics.Rendering.Scene;
 /// </summary>
 internal sealed class SceneVisibilitySystem
 {
-    private readonly HashSet<string> _visibleNodeIds = [];
-    private readonly List<EdgeSnapshot> _edgeBuffer = [];
+    private readonly HashSet<int> _visibleNodeIndices = [];
+    private readonly List<EdgeSnapshotIndexed> _edgeBuffer = [];
 
     /// <summary>
     /// Builds hierarchy edges where both endpoints are visible.
     /// </summary>
-    public IReadOnlyList<EdgeSnapshot> BuildVisibleHierarchyEdges(
+    public IReadOnlyList<EdgeSnapshotIndexed> BuildVisibleHierarchyEdges(
         RenderState state,
         IReadOnlyList<NodeSnapshot> visibleNodes)
     {
-        _visibleNodeIds.Clear();
+        _visibleNodeIndices.Clear();
         _edgeBuffer.Clear();
 
-        foreach (var node in visibleNodes)
+        var visibleNodeIds = new HashSet<string>(visibleNodes.Select(node => node.Id));
+
+        for (var i = 0; i < state.Scene.Nodes.Count; i++)
         {
-            _visibleNodeIds.Add(
-                node.Id);
+            if (visibleNodeIds.Contains(state.Scene.Nodes[i].Id))
+                _visibleNodeIndices.Add(i);
         }
 
         foreach (var edge in state.Scene.Edges)
@@ -33,8 +36,8 @@ internal sealed class SceneVisibilitySystem
             if (edge.Kind != EdgeKind.Hierarchy)
                 continue;
 
-            if (!_visibleNodeIds.Contains(edge.FromId) ||
-                !_visibleNodeIds.Contains(edge.ToId))
+            if (!_visibleNodeIndices.Contains(edge.FromIndex) ||
+                !_visibleNodeIndices.Contains(edge.ToIndex))
             {
                 continue;
             }
@@ -43,7 +46,7 @@ internal sealed class SceneVisibilitySystem
                 edge);
         }
 
-        _visibleNodeIds.Clear();
+        _visibleNodeIndices.Clear();
 
         return _edgeBuffer;
     }

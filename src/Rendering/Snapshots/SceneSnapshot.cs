@@ -15,15 +15,19 @@ internal sealed class SceneSnapshot : ISceneSnapshot
     /// Fast node lookup index.
     /// </summary>
     private readonly Dictionary<string, NodeSnapshot> _nodeIndex;
+    private readonly Dictionary<string, int> _nodePositionIndex;
 
     internal SceneSnapshot(
         IReadOnlyList<NodeSnapshot> nodes,
         IReadOnlyList<AvatarSnapshot> avatars,
-        IReadOnlyList<EdgeSnapshot> edges,
+        IReadOnlyList<EdgeSnapshotIndexed> edges,
         IReadOnlyList<ParticleSnapshot> particles)
     {
         _nodeIndex =
             new Dictionary<string, NodeSnapshot>(
+                nodes.Count);
+        _nodePositionIndex =
+            new Dictionary<string, int>(
                 nodes.Count);
 
         foreach (NodeSnapshot node in nodes)
@@ -41,18 +45,21 @@ internal sealed class SceneSnapshot : ISceneSnapshot
                 .ThenBy(n => n.Id)
                 .ToArray();
 
+        for (var i = 0; i < Nodes.Count; i++)
+            _nodePositionIndex[Nodes[i].Id] = i;
+
         Avatars =
             avatars;
 
         Edges =
             edges
                 .Where(e =>
-                    !string.IsNullOrWhiteSpace(e.ToId) &&
-                    !string.IsNullOrWhiteSpace(e.FromId) &&
-                    _nodeIndex.ContainsKey(e.FromId) &&
-                    _nodeIndex.ContainsKey(e.ToId))
+                    e.FromIndex >= 0 &&
+                    e.ToIndex >= 0 &&
+                    e.FromIndex < Nodes.Count &&
+                    e.ToIndex < Nodes.Count)
                 .DistinctBy(e =>
-                    (e.FromId, e.ToId, e.Kind))
+                    (e.FromIndex, e.ToIndex, e.Kind))
                 .ToArray();
 
         Particles =
@@ -78,7 +85,7 @@ internal sealed class SceneSnapshot : ISceneSnapshot
     /// <summary>
     /// Scene edges.
     /// </summary>
-    public IReadOnlyList<EdgeSnapshot> Edges { get; }
+    public IReadOnlyList<EdgeSnapshotIndexed> Edges { get; }
 
     /// <summary>
     /// Active particles.
@@ -178,25 +185,35 @@ internal sealed class SceneSnapshot : ISceneSnapshot
     /// <summary>
     /// Returns outgoing edges for node.
     /// </summary>
-    public IEnumerable<EdgeSnapshot> EdgesFrom(string nodeId) =>
-        Edges.Where(e => e.FromId == nodeId);
+    public IEnumerable<EdgeSnapshotIndexed> EdgesFrom(string nodeId)
+    {
+        if (!_nodePositionIndex.TryGetValue(nodeId, out var fromIndex))
+            return [];
+
+        return Edges.Where(e => e.FromIndex == fromIndex);
+    }
 
     /// <summary>
     /// Returns incoming edges for node.
     /// </summary>
-    public IEnumerable<EdgeSnapshot> EdgesTo(string nodeId) =>
-        Edges.Where(e => e.ToId == nodeId);
+    public IEnumerable<EdgeSnapshotIndexed> EdgesTo(string nodeId)
+    {
+        if (!_nodePositionIndex.TryGetValue(nodeId, out var toIndex))
+            return [];
+
+        return Edges.Where(e => e.ToIndex == toIndex);
+    }
 
     /// <summary>
     /// Returns edges matching a specified kind.
     /// </summary>
-    public IEnumerable<EdgeSnapshot> EdgesOfKind(EdgeKind kind) =>
+    public IEnumerable<EdgeSnapshotIndexed> EdgesOfKind(EdgeKind kind) =>
         Edges.Where(e => e.Kind == kind);
 
     /// <summary>
     /// Returns visible edges above an alpha threshold.
     /// </summary>
-    public IEnumerable<EdgeSnapshot> VisibleEdges(
+    public IEnumerable<EdgeSnapshotIndexed> VisibleEdges(
         float alphaThreshold = 0.02f) =>
         Edges.Where(e => e.Alpha > alphaThreshold);
 

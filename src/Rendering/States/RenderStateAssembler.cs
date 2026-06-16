@@ -40,6 +40,17 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
     public void Reset() =>
         _leaderboard.Reset();
 
+    private static Dictionary<string, int> BuildNodeIndex(
+        IReadOnlyList<NodeSnapshot> nodes)
+    {
+        var nodeIndex = new Dictionary<string, int>(nodes.Count);
+
+        for (var i = 0; i < nodes.Count; i++)
+            nodeIndex[nodes[i].Id] = i;
+
+        return nodeIndex;
+    }
+
     /// <summary>
     /// Assembles a full immutable render state snapshot.
     /// </summary>
@@ -56,8 +67,9 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
         LayoutMode layoutMode)
     {
         var nodeSnapshots = _nodes.Assemble(scene.Nodes);
+        var nodeIndex = BuildNodeIndex(nodeSnapshots);
         var avatarSnapshots = _avatars.Assemble(scene.Avatars, out var activeAvatarsCount);
-        var edgeSnapshots = _edges.Assemble(scene);
+        var edgeSnapshots = _edges.Assemble(scene, nodeIndex);
         var particleSnapshots = _particles.Assemble(animationSystem);
         var extensions = _extensions.Assemble(scene);
         var leaderboard = _leaderboard.Assemble();

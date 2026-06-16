@@ -16,12 +16,12 @@ internal sealed class EdgeVisibilityFilter
     /// Counts file children grouped by parent node id.
     /// </summary>
     public Dictionary<string, int> CountFileChildrenByParent(
-        ISceneGraph scene)
+        IReadOnlyDictionary<string, SceneNode> nodes)
     {
         var counts =
             new Dictionary<string, int>();
 
-        foreach (var node in scene.Nodes.Values)
+        foreach (var node in nodes.Values)
         {
             if (node.Kind != NodeKind.File)
                 continue;

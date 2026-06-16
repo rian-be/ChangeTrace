@@ -29,8 +29,9 @@ public class SceneSnapshotComponentBenchmarks
 
     private RenderBenchmarkFixture _fixture = null!;
     private IReadOnlyList<NodeSnapshot> _prebuiltNodes = null!;
+    private IReadOnlyDictionary<string, int> _prebuiltNodeIndex = null!;
     private IReadOnlyList<AvatarSnapshot> _prebuiltAvatars = null!;
-    private IReadOnlyList<EdgeSnapshot> _prebuiltEdges = null!;
+    private IReadOnlyList<EdgeSnapshotIndexed> _prebuiltEdges = null!;
     private IReadOnlyList<ParticleSnapshot> _prebuiltParticles = null!;
 
     /// <summary>
@@ -47,8 +48,9 @@ public class SceneSnapshotComponentBenchmarks
     {
         _fixture = RenderBenchmarkFixture.Create(EventCount);
         _prebuiltNodes = _nodeAssembler.Assemble(_fixture.Scene.Nodes);
+        _prebuiltNodeIndex = BuildNodeIndex(_prebuiltNodes);
         _prebuiltAvatars = _avatarAssembler.Assemble(_fixture.Scene.Avatars, out _);
-        _prebuiltEdges = _edgeAssembler.Assemble(_fixture.Scene);
+        _prebuiltEdges = _edgeAssembler.Assemble(_fixture.Scene, _prebuiltNodeIndex);
         _prebuiltParticles = _particleAssembler.Assemble(_fixture.Animation);
     }
 
@@ -72,7 +74,7 @@ public class SceneSnapshotComponentBenchmarks
     /// </summary>
     [Benchmark]
     public int AssembleEdgeSnapshots()
-        => _edgeAssembler.Assemble(_fixture.Scene).Count;
+        => _edgeAssembler.Assemble(_fixture.Scene, _prebuiltNodeIndex).Count;
 
     /// <summary>
     /// Captures particle snapshots from the animation system.
@@ -94,5 +96,16 @@ public class SceneSnapshotComponentBenchmarks
             _prebuiltParticles);
 
         return snapshot.TotalObjects;
+    }
+
+    private static Dictionary<string, int> BuildNodeIndex(
+        IReadOnlyList<NodeSnapshot> nodes)
+    {
+        var nodeIndex = new Dictionary<string, int>(nodes.Count);
+
+        for (var i = 0; i < nodes.Count; i++)
+            nodeIndex[nodes[i].Id] = i;
+
+        return nodeIndex;
     }
 }
