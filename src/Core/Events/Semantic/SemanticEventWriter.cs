@@ -54,6 +54,25 @@ public sealed class SemanticEventWriter<T>(int initialCapacity = 128) : ISemanti
     }
 
     /// <summary>
+    /// Ensures the writer has room for an additional number of events without repeated growth.
+    /// </summary>
+    /// <param name="additionalCount">The number of additional events expected to be written.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the writer has been disposed.</exception>
+    public void EnsureAdditionalCapacity(int additionalCount)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(SemanticEventWriter<T>));
+        if (additionalCount <= 0)
+            return;
+
+        var required = _count + additionalCount;
+
+        if (required <= _buffer.Length)
+            return;
+
+        Grow(required);
+    }
+
+    /// <summary>
     /// Returns snapshot of the written events as <see cref="ReadOnlyMemory{T}"/>.
     /// </summary>
     /// <returns>A read-only memory segment containing all written events.</returns>
@@ -90,8 +109,18 @@ public sealed class SemanticEventWriter<T>(int initialCapacity = 128) : ISemanti
     /// Doubles buffer size when capacity is exceeded.
     /// </summary>
     private void Grow()
+        => Grow(_buffer.Length * 2);
+
+    /// <summary>
+    /// Grows buffer to satisfy a required capacity.
+    /// </summary>
+    private void Grow(int requiredCapacity)
     {
         var newSize = _buffer.Length * 2;
+
+        if (newSize < requiredCapacity)
+            newSize = requiredCapacity;
+
         var newBuffer = ArrayPool<T>.Shared.Rent(newSize);
         Array.Copy(_buffer, newBuffer, _count);
         ArrayPool<T>.Shared.Return(_buffer, clearArray: false);

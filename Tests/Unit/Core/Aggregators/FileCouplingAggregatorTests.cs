@@ -1,5 +1,6 @@
 using ChangeTrace.Core.Aggregators;
 using ChangeTrace.Core.Events.Semantic;
+using ChangeTrace.Core.Options;
 using Xunit;
 
 namespace ChangeTrace.Tests.Core.Aggregators;
@@ -40,6 +41,24 @@ public sealed class FileCouplingAggregatorTests
             .ToArray();
 
         aggregator.Process(new CommitBundleEvent("commit-1", "rian", 123, files));
+
+        Assert.Equal(0, writer.Count);
+    }
+
+    /// <summary>Process skips bundles that exceed the configured file threshold.</summary>
+    [Fact]
+    public void Process_SkipsLargeBundlesAboveConfiguredThreshold()
+    {
+        using var writer = new SemanticEventWriter<FileCouplingEvent>();
+        var aggregator = new FileCouplingAggregator(
+            writer,
+            new FileCouplingAggregatorOptions(MaxFilesPerCommit: 4));
+
+        aggregator.Process(new CommitBundleEvent(
+            "commit-1",
+            "rian",
+            123,
+            new[] { "a.cs", "b.cs", "c.cs", "d.cs", "e.cs" }));
 
         Assert.Equal(0, writer.Count);
     }
