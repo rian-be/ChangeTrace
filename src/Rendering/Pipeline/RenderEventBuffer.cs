@@ -15,6 +15,7 @@ internal sealed class RenderEventBuffer(RenderEventKinds renderEvents) : IDispos
         renderEvents);
 
     private RenderEventKinds _renderEvents = renderEvents;
+    private bool _hasBufferedEvents;
 
     /// <summary>
     /// Updates enabled render event kinds and resets aggregation state.
@@ -46,17 +47,21 @@ internal sealed class RenderEventBuffer(RenderEventKinds renderEvents) : IDispos
         {
             _aggregation.Process(
                 evt);
+            _hasBufferedEvents = true;
         }
     }
 
     /// <summary>
     /// Flushes buffered events into the rendering pipeline.
     /// </summary>
-    public void FlushTo(
+    public bool FlushTo(
         RenderingPipeline pipeline)
     {
         lock (_sync)
         {
+            if (!_hasBufferedEvents)
+                return false;
+
             _aggregation.Flush();
 
             foreach (var t in RenderEventDispatchTable.Table)
@@ -72,6 +77,8 @@ internal sealed class RenderEventBuffer(RenderEventKinds renderEvents) : IDispos
             }
 
             _aggregation.Clear();
+            _hasBufferedEvents = false;
+            return true;
         }
     }
 

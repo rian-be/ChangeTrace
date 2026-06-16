@@ -25,7 +25,8 @@ internal sealed class RenderFrameAssembler(
         PlayerDiagnostics diagnostics,
         SceneNode? hoveredNode,
         HoveredPodHud? hoveredPod,
-        LayoutMode layoutMode)
+        LayoutMode layoutMode,
+        bool sceneUnchanged = false)
     {
         var state =
             assembler.Assemble(
@@ -38,7 +39,8 @@ internal sealed class RenderFrameAssembler(
                 diagnostics,
                 hoveredNode,
                 hoveredPod,
-                layoutMode);
+                layoutMode,
+                sceneUnchanged);
 
         output.Submit(
             state);

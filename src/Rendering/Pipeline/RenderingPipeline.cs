@@ -146,23 +146,27 @@ internal sealed class RenderingPipeline : IRenderingPipeline
             ClearSceneState();
         }
 
-        _events.FlushTo(
-            this);
+        var hadNewEvents =
+            _events.FlushTo(
+                this);
 
-        UpdateFrame();
+        UpdateFrame(
+            hadNewEvents);
     }
 
     /// <summary>
     /// Updates simulation, hover state, diagnostics, and frame output.
     /// </summary>
-    private void UpdateFrame()
+    private void UpdateFrame(
+        bool hadNewEvents)
     {
         var diagnostics =
             Player.GetDiagnostics();
 
         float dt =
             _frameUpdater.Tick(
-                diagnostics);
+                diagnostics,
+                hadNewEvents);
 
         _hover.Tick();
 
@@ -183,7 +187,8 @@ internal sealed class RenderingPipeline : IRenderingPipeline
             diagnostics,
             _hover.HoveredNode,
             _hover.HoveredPod,
-            _options.Mode);
+            _options.Mode,
+            sceneUnchanged: !hadNewEvents && dt == 0f);
     }
 
     /// <summary>

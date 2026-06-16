@@ -22,14 +22,16 @@ internal sealed class SceneFrameUpdater(
     /// Ticks all frame-level scene systems and returns clamped delta time.
     /// </summary>
     public float Tick(
-        PlayerDiagnostics diagnostics)
+        PlayerDiagnostics diagnostics,
+        bool hadNewEvents = false)
     {
         float dt = CalculateDeltaTime(
             diagnostics);
 
         StepLayout(
             diagnostics,
-            dt);
+            dt,
+            hadNewEvents);
 
         anim.Tick(
             dt);
@@ -68,7 +70,8 @@ internal sealed class SceneFrameUpdater(
             currentWallTime;
 
         if (diagnostics.State == PlayerState.Idle ||
-            diagnostics.State == PlayerState.Paused)
+            diagnostics.State == PlayerState.Paused ||
+            diagnostics.State == PlayerState.Finished)
         {
             return 0f;
         }
@@ -83,10 +86,17 @@ internal sealed class SceneFrameUpdater(
     /// </summary>
     private void StepLayout(
         PlayerDiagnostics diagnostics,
-        float dt)
+        float dt,
+        bool hadNewEvents)
     {
         if (dt <= 0f)
             return;
+
+        if (!hadNewEvents &&
+            layout.Energy <= 0f)
+        {
+            return;
+        }
 
         float speedBoost =
             (float)Math.Max(
