@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using ChangeTrace.Benchmarks.Rendering;
 using ChangeTrace.Benchmarks.Shared.Rendering;
 using ChangeTrace.Rendering.Snapshots;
+using ChangeTrace.Rendering.States.Scene;
 
 namespace ChangeTrace.Benchmarks.Subsystem.Rendering;
 

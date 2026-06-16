@@ -9,6 +9,7 @@ using ChangeTrace.Rendering.States.Edges;
 using ChangeTrace.Rendering.States.Hud;
 using ChangeTrace.Rendering.States.Nodes;
 using ChangeTrace.Rendering.States.Particles;
+using ChangeTrace.Rendering.States.Scene;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChangeTrace.Rendering.States;
@@ -87,7 +88,7 @@ internal sealed class RenderStateAssembler : IRenderStateAssembler
                 leaderboard);
 
         var sceneSnapshot =
-            new SceneSnapshot(
+            SceneSnapshotMaterializer.Create(
                 nodeSnapshots,
                 avatarSnapshots,
                 edgeSnapshots,

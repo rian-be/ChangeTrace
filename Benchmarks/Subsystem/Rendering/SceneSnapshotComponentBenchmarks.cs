@@ -6,6 +6,7 @@ using ChangeTrace.Rendering.States.Avatars;
 using ChangeTrace.Rendering.States.Edges;
 using ChangeTrace.Rendering.States.Nodes;
 using ChangeTrace.Rendering.States.Particles;
+using ChangeTrace.Rendering.States.Scene;
 
 namespace ChangeTrace.Benchmarks.Subsystem.Rendering;
 
@@ -89,7 +90,7 @@ public class SceneSnapshotComponentBenchmarks
     [Benchmark]
     public int MaterializeSceneSnapshot()
     {
-        var snapshot = new SceneSnapshot(
+        var snapshot = SceneSnapshotMaterializer.Create(
             _prebuiltNodes,
             _prebuiltAvatars,
             _prebuiltEdges,

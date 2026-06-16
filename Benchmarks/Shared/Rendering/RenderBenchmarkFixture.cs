@@ -18,6 +18,7 @@ using ChangeTrace.Rendering.States.Avatars;
 using ChangeTrace.Rendering.States.Edges;
 using ChangeTrace.Rendering.States.Nodes;
 using ChangeTrace.Rendering.States.Particles;
+using ChangeTrace.Rendering.States.Scene;
 
 namespace ChangeTrace.Benchmarks.Shared.Rendering;
 
@@ -155,7 +156,7 @@ internal sealed class RenderBenchmarkFixture
         var edges = _edgeSnapshots.Assemble(Scene, nodeIndex);
         var particles = _particleSnapshots.Assemble(Animation);
 
-        return new SceneSnapshot(nodes, avatars, edges, particles);
+        return SceneSnapshotMaterializer.Create(nodes, avatars, edges, particles);
     }
 
     /// <summary>
